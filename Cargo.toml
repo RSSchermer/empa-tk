@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "empa-tk",
+    "examples/web/prefix_sum",
+]

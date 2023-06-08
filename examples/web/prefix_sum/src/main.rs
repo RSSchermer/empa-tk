@@ -2,13 +2,13 @@ use std::error::Error;
 
 use arwa::console;
 use arwa::window::window;
+use empa::adapter::Features;
 use empa::arwa::{NavigatorExt, RequestAdapterOptions};
 use empa::buffer;
 use empa::buffer::Buffer;
 use empa::device::DeviceDescriptor;
 use empa_tk::prefix_sum::PrefixSum;
 use futures::FutureExt;
-use empa::adapter::Features;
 
 fn main() {
     arwa::spawn_local(compute().map(|res| res.unwrap()));
@@ -22,10 +22,12 @@ async fn compute() -> Result<(), Box<dyn Error>> {
         .request_adapter(&RequestAdapterOptions::default())
         .await
         .ok_or("adapter not found")?;
-    let device = adapter.request_device(&DeviceDescriptor {
-        required_features: Features::TIMESTAMP_QUERY,
-        required_limits: Default::default()
-    }).await?;
+    let device = adapter
+        .request_device(&DeviceDescriptor {
+            required_features: Features::TIMESTAMP_QUERY,
+            required_limits: Default::default(),
+        })
+        .await?;
 
     let mut evaluator = PrefixSum::init_u32(device.clone());
 
@@ -34,13 +36,13 @@ async fn compute() -> Result<(), Box<dyn Error>> {
 
     let data_buffer: Buffer<[u32], _> =
         device.create_buffer(data, buffer::Usages::storage_binding().and_copy_src());
-    let readback_buffer: Buffer<[u32], _> = device.create_buffer(
-        vec![0; count],
-        buffer::Usages::map_read().and_copy_dst(),
-    );
+    let readback_buffer: Buffer<[u32], _> =
+        device.create_buffer(vec![0; count], buffer::Usages::map_read().and_copy_dst());
     let timestamp_query_set = device.create_timestamp_query_set(2);
-    let timestamps = device.create_slice_buffer_zeroed(2, buffer::Usages::query_resolve().and_copy_src());
-    let timestamps_readback = device.create_slice_buffer_zeroed(2, buffer::Usages::copy_dst().and_map_read());
+    let timestamps =
+        device.create_slice_buffer_zeroed(2, buffer::Usages::query_resolve().and_copy_src());
+    let timestamps_readback =
+        device.create_slice_buffer_zeroed(2, buffer::Usages::copy_dst().and_map_read());
 
     let mut encoder = device.create_command_encoder();
 

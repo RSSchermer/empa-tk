@@ -5,5 +5,5 @@ authors = ["RSSchermer <roland0507@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-empa = { version = "0.1.0", path = "../../glitz/empa", features = ["arwa"] }
+empa = { version = "0.1.0", path = "../../glitz/empa" }
 zeroable = { path = "../../zeroable_crates/zeroable" }

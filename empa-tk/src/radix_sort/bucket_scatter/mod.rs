@@ -12,9 +12,14 @@ use empa::type_flag::{O, X};
 use empa::{abi, buffer};
 use zeroable::Zeroable;
 
-use crate::radix_sort::{RADIX_DIGITS, RADIX_GROUPS, RADIX_SIZE, SEGMENT_SIZE};
+use crate::radix_sort::{RADIX_DIGITS, RADIX_GROUPS, RADIX_SIZE};
 
 const SHADER_U32: ShaderSource = shader_source!("shader_u32.wgsl");
+
+const GROUP_SIZE: u32 = 256;
+const VALUES_PER_THREAD: u32 = 4;
+
+const SEGMENT_SIZE: u32 = GROUP_SIZE * VALUES_PER_THREAD;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(u32)]
@@ -73,8 +78,6 @@ where
     group_state: Storage<[[GroupState; RADIX_DIGITS]]>,
     #[resource(binding = 5, visibility = "COMPUTE")]
     group_counter: Storage<u32>,
-    #[resource(binding = 6, visibility = "COMPUTE")]
-    debug: Storage<[T]>,
 }
 
 type ResourcesLayout<T> = <Resources<T> as empa::resource_binding::Resources>::Layout;
@@ -95,12 +98,11 @@ where
     pipeline: ComputePipeline<(ResourcesLayout<T>,)>,
     group_state: Buffer<[[GroupState; RADIX_DIGITS]], buffer::Usages<O, O, X, O, O, O, X, O, O, O>>,
     group_counter: Buffer<u32, buffer::Usages<O, O, X, O, O, O, X, O, O, O>>,
-    debug_buffer: Buffer<[T], buffer::Usages<O, O, X, O, O, O, X, X, O, O>>,
 }
 
 impl<T> BucketScatter<T>
 where
-    T: abi::Sized + Zeroable,
+    T: abi::Sized,
 {
     fn init_internal(device: Device, shader_source: &ShaderSource) -> Self {
         let shader = device.create_shader_module(shader_source);
@@ -119,15 +121,12 @@ where
         let group_counter =
             device.create_buffer(0, buffer::Usages::storage_binding().and_copy_dst());
 
-        let debug_buffer = device.create_slice_buffer_zeroed(1, buffer::Usages::storage_binding().and_copy_dst().and_copy_src());
-
         BucketScatter {
             device,
             bind_group_layout,
             pipeline,
             group_state,
             group_counter,
-            debug_buffer
         }
     }
 
@@ -158,10 +157,6 @@ where
                 .create_slice_buffer_zeroed(workgroups as usize, self.group_state.usage());
         }
 
-        if self.debug_buffer.len() < data_in.len() {
-            self.debug_buffer = self.device.create_slice_buffer_zeroed(data_in.len(), self.debug_buffer.usage());
-        }
-
         let uniforms = self.device.create_buffer(
             Uniforms {
                 radix_offset,
@@ -179,14 +174,12 @@ where
                 global_base_bucket_offsets: global_base_bucket_offsets.read_only_storage(),
                 group_state: self.group_state.storage(),
                 group_counter: self.group_counter.storage(),
-                debug: self.debug_buffer.storage()
             },
         );
 
         encoder
             .clear_buffer(self.group_counter.view())
             .clear_buffer_slice(self.group_state.view())
-            .clear_buffer_slice(self.debug_buffer.view())
             .begin_compute_pass()
             .set_pipeline(&self.pipeline)
             .set_bind_groups(&bind_group)
@@ -196,10 +189,6 @@ where
                 count_z: 1,
             })
             .end()
-    }
-
-    pub fn debug(&self) -> buffer::View<[T], impl buffer::CopySrc> {
-        self.debug_buffer.view()
     }
 }
 

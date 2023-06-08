@@ -13,7 +13,6 @@ mod bucket_histogram;
 mod bucket_scatter;
 mod global_bucket_offsets;
 
-const SEGMENT_SIZE: u32 = 256;
 const RADIX_SIZE: u32 = 8;
 const RADIX_DIGITS: usize = 256;
 const RADIX_GROUPS: usize = 4;
@@ -31,12 +30,12 @@ where
     global_bucket_offsets: GlobalBucketOffsets,
     bucket_scatter: BucketScatter<T>,
     global_bucket_data:
-        Buffer<[[u32; RADIX_DIGITS]; RADIX_GROUPS], buffer::Usages<O, O, X, O, O, O, X, X, O, O>>,
+        Buffer<[[u32; RADIX_DIGITS]; RADIX_GROUPS], buffer::Usages<O, O, X, O, O, O, X, O, O, O>>,
 }
 
 impl<T> RadixSort<T>
 where
-    T: abi::Sized + Zeroable,
+    T: abi::Sized,
 {
     pub fn encode<U0, U1>(
         &mut self,
@@ -103,24 +102,13 @@ where
 
         encoder
     }
-
-    pub fn global_offsets(
-        &self,
-    ) -> buffer::View<[[u32; RADIX_DIGITS]; RADIX_GROUPS], impl buffer::CopySrc> {
-        self.global_bucket_data.view()
-    }
-
-    pub fn debug(&self) -> buffer::View<[T], impl buffer::CopySrc> {
-        self.bucket_scatter.debug()
-    }
 }
 
 impl RadixSort<u32> {
     pub fn init_u32(device: Device) -> Self {
         let global_bucket_data = device.create_buffer_zeroed(
             buffer::Usages::storage_binding()
-                .and_copy_dst()
-                .and_copy_src(),
+                .and_copy_dst(),
         );
 
         let bucket_histogram = BucketHistogram::init_u32(device.clone());

@@ -7,7 +7,7 @@ use empa::arwa::{NavigatorExt, RequestAdapterOptions};
 use empa::buffer;
 use empa::buffer::Buffer;
 use empa::device::DeviceDescriptor;
-use empa_tk::radix_sort::{RadixSort, RadixSortInput};
+use empa_tk::radix_sort::{RadixSortBy, RadixSortByInput};
 use futures::FutureExt;
 
 fn main() {
@@ -30,24 +30,31 @@ async fn compute() -> Result<(), Box<dyn Error>> {
         })
         .await?;
 
-    let mut radix_sort = RadixSort::init_u32(device.clone());
+    let mut radix_sort_by = RadixSortBy::init_keys_u32_values_u32(device.clone());
 
     let count = 1_000_000;
 
-    console::log!("Sorting %i values...", count);
+    console::log!("Sorting %i values by their keys...", count);
 
     let mut rng = oorandom::Rand32::new(1);
-    let mut data: Vec<u32> = Vec::with_capacity(count);
+    let mut keys: Vec<u32> = Vec::with_capacity(count);
+    let mut values: Vec<u32> = Vec::with_capacity(count);
 
     for _ in 0..count {
-        data.push(rng.rand_u32());
+        keys.push(rng.rand_u32());
+        values.push(rng.rand_u32());
     }
 
-    let data_buffer: Buffer<[u32], _> =
-        device.create_buffer(&*data, buffer::Usages::storage_binding().and_copy_src());
-    let temp_storage_buffer: Buffer<[u32], _> =
+    let keys_buffer: Buffer<[u32], _> =
+        device.create_buffer(&*keys, buffer::Usages::storage_binding().and_copy_src());
+    let temp_key_storage_buffer: Buffer<[u32], _> =
         device.create_slice_buffer_zeroed(count, buffer::Usages::storage_binding().and_copy_src());
-    let readback_buffer: Buffer<[u32], _> =
+    let values_buffer: Buffer<[u32], _> =
+        device.create_buffer(&*values, buffer::Usages::storage_binding().and_copy_src());
+    let temp_value_storage_buffer: Buffer<[u32], _> =
+        device.create_slice_buffer_zeroed(count, buffer::Usages::storage_binding().and_copy_src());
+
+    let value_readback_buffer: Buffer<[u32], _> =
         device.create_buffer(vec![0; count], buffer::Usages::map_read().and_copy_dst());
     let timestamp_query_set = device.create_timestamp_query_set(2);
     let timestamps =
@@ -58,16 +65,18 @@ async fn compute() -> Result<(), Box<dyn Error>> {
     let mut encoder = device.create_command_encoder();
 
     encoder = encoder.write_timestamp(&timestamp_query_set, 0);
-    encoder = radix_sort.encode(
+    encoder = radix_sort_by.encode(
         encoder,
-        RadixSortInput {
-            data: data_buffer.view(),
-            temporary_storage: temp_storage_buffer.view(),
+        RadixSortByInput {
+            keys: keys_buffer.view(),
+            values: values_buffer.view(),
+            temporary_key_storage: temp_key_storage_buffer.view(),
+            temporary_value_storage: temp_value_storage_buffer.view()
         },
     );
     encoder = encoder.write_timestamp(&timestamp_query_set, 1);
 
-    encoder = encoder.copy_buffer_to_buffer_slice(data_buffer.view(), readback_buffer.view());
+    encoder = encoder.copy_buffer_to_buffer_slice(values_buffer.view(), value_readback_buffer.view());
 
     encoder = encoder.resolve_timestamp_query_set(&timestamp_query_set, 0, timestamps.view());
     encoder = encoder.copy_buffer_to_buffer_slice(timestamps.view(), timestamps_readback.view());
@@ -77,45 +86,49 @@ async fn compute() -> Result<(), Box<dyn Error>> {
     let performance = window.performance();
 
     let cpu_time_start = performance.now();
-    // Note: sort_unstable is about 30% faster
-    data.sort();
+
+    let mut permutation = permutation::sort(&keys);
+
+    permutation.apply_slice_in_place(&mut keys);
+    permutation.apply_slice_in_place(&mut values);
+
     let cpu_time_end = performance.now();
 
     let cpu_time_elapsed = cpu_time_end - cpu_time_start;
 
-    readback_buffer.map_read().await?;
+    value_readback_buffer.map_read().await?;
 
     {
-        let readback = readback_buffer.mapped();
+        let values_readback = value_readback_buffer.mapped();
 
         console::log!(
-            "The first 10 numbers computed on the GPU:",
-            format!("{:#?}", &readback[..10])
+            "The first 10 values computed on the GPU:",
+            format!("{:#?}", &values_readback[..10])
         );
         console::log!(
-            "The first 10 numbers computed on the CPU (reference):",
-            format!("{:#?}", &data[..10])
+            "The first 10 values computed on the CPU (reference):",
+            format!("{:#?}", &values[..10])
         );
 
         console::log!(
-            "The last 10 numbers computed on the GPU:",
-            format!("{:#?}", &readback[readback.len() - 10..])
+            "The last 10 values computed on the GPU:",
+            format!("{:#?}", &values_readback[values_readback.len() - 10..])
         );
         console::log!(
-            "The last 10 numbers computed on the CPU (reference):",
-            format!("{:#?}", &data[data.len() - 10..])
+            "The last 10 values computed on the CPU (reference):",
+            format!("{:#?}", &values[values.len() - 10..])
         );
 
         console::log!("Asserting all values produced by the GPU sort match the values produced by the CPU sort...");
 
         for i in 0..count {
-            assert_eq!(&readback[i], &data[i]);
+            assert_eq!(&values_readback[i], &values[i]);
         }
 
         console::log!("...successfully!");
     }
 
-    readback_buffer.unmap();
+    value_readback_buffer.unmap();
 
     timestamps_readback.map_read().await?;
 
@@ -126,7 +139,7 @@ async fn compute() -> Result<(), Box<dyn Error>> {
 
         console::log!("Time elapsed GPU: %f milliseconds", gpu_time_elapsed_ms);
         console::log!(
-            "Time elapsed CPU (Rust `std` sort compiled to WASM): %f milliseconds",
+            "Time elapsed CPU (using the `permutation` crate): %f milliseconds",
             cpu_time_elapsed
         );
     }

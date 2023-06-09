@@ -2,5 +2,6 @@
 members = [
     "empa-tk",
     "examples/web/prefix_sum",
-    "examples/web/radix_sort"
+    "examples/web/radix_sort",
+    "examples/web/radix_sort_by"
 ]

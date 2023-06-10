@@ -1,5 +1,7 @@
-const SEGMENT_SIZE = 512u;
 const GROUP_SIZE = 256u;
+const VALUES_PER_THREAD = 8u;
+
+const SEGMENT_SIZE = 2048u; // GROUP_SIZE * VALUES_PER_THREAD;
 
 const GROUP_STATUS_X = 0u;
 const GROUP_STATUS_A = 1u;
@@ -53,65 +55,31 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
 
     workgroupBarrier();
 
-    // The "up-sweep" phase of the Blelloch algorithm. We implement an unrolled version  of the algorithm for the
-    // specific workgroup size of `256`.
-    //
-    // We can do the first step before the first barrier, as in this step each thread only touches the 2 values it just
-    // loaded itself. We then synchronize between each step. Every thread on the group participates in the first step,
-    // then for each subsequent step the number of participating threads halves.
+    for (var i = 1u; i < firstLeadingBit(SEGMENT_SIZE); i += 1) {
+        let multiplier = 1u << i;
+        let a_offset = multiplier - 1;
+        let b_offset = (multiplier >> 1) - 1;
 
-    shared_data[local_index * 2 + 1] += shared_data[local_index * 2];
-    workgroupBarrier();
+        let threshold = SEGMENT_SIZE >> i;
 
-    if local_index < 128 {
-        shared_data[local_index * 4 + 3] += shared_data[local_index * 4 + 1];
+        for (var j = local_index; j < threshold; j += GROUP_SIZE) {
+            let base_offset = j * multiplier;
+
+            shared_data[base_offset + a_offset] += shared_data[base_offset + b_offset];
+        }
+
+        workgroupBarrier();
     }
-    workgroupBarrier();
 
-    if local_index < 64 {
-        shared_data[local_index * 8 + 7] += shared_data[local_index * 8 + 3];
-    }
-    workgroupBarrier();
-
-    if local_index < 32 {
-        shared_data[local_index * 16 + 15] += shared_data[local_index * 16 + 7];
-    }
-    workgroupBarrier();
-
-    if local_index < 16 {
-        shared_data[local_index * 32 + 31] += shared_data[local_index * 32 + 15];
-    }
-    workgroupBarrier();
-
-    if local_index < 8 {
-        shared_data[local_index * 64 + 63] += shared_data[local_index * 64 + 31];
-    }
-    workgroupBarrier();
-
-    if local_index < 4 {
-        shared_data[local_index * 128 + 127] += shared_data[local_index * 128 + 63];
-    }
-    workgroupBarrier();
-
-    if local_index < 2 {
-        shared_data[local_index * 256 + 255] += shared_data[local_index * 256 + 127];
-    }
-    workgroupBarrier();
-
-    // We skip the final up-sweep step, because this step only sets the last element in the shared array, which would
-    // be set to `0` in the "down-sweep" phase.
-
-    // The "down-sweep" phase of the Blelloch algorithm. We again implement an unrolled version of the algorithm for the
-    // specific workgroup size of `256`, synchronizing between each step. Only one thread participates on the first
-    // step, then for each subsequent step the number of threads that participate doubles, until all threads participate
-    // in the final step.
+    let last_index = SEGMENT_SIZE - 1;
+    let mid_index = (SEGMENT_SIZE >> 1) - 1;
 
     var status = 0u;
     var aggregate: DATA_TYPE;
 
     if local_index == 0 {
         // We can compute the aggregate of all elements in this workgroup's data segment now.
-        aggregate = shared_data[511] + shared_data[255];
+        aggregate = shared_data[last_index] + shared_data[mid_index];
 
         if group_index == 0 {
             atomicStore(&group_state[0].inclusive_prefix, bitcast<u32>(aggregate));
@@ -129,71 +97,32 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
     if local_index == 0 {
         atomicStore(&group_state[group_index].status, status);
 
-        shared_data[511] = shared_data[255];
-        shared_data[255] = 0;
+        shared_data[last_index] = shared_data[mid_index];
+        shared_data[mid_index] = 0;
     }
     workgroupBarrier();
 
-    if local_index < 2 {
-        let v = shared_data[local_index * 256 + 255];
+    for (var i = 1u; i < firstLeadingBit(SEGMENT_SIZE); i += 1) {
+        let multiplier = SEGMENT_SIZE >> i;
+        let a_offset = multiplier - 1;
+        let b_offset = (multiplier >> 1) - 1;
 
-        shared_data[local_index * 256 + 255] += shared_data[local_index * 256 + 127];
-        shared_data[local_index * 256 + 127] = v;
+        let threshold = 1u << i;
+
+        for (var j = local_index; j < threshold; j += GROUP_SIZE) {
+            let base_offset = j * multiplier;
+
+            let a_index = base_offset + a_offset;
+            let b_index = base_offset + b_offset;
+
+            let v = shared_data[a_index];
+
+            shared_data[a_index] += shared_data[b_index];
+            shared_data[b_index] = v;
+        }
+
+        workgroupBarrier();
     }
-    workgroupBarrier();
-
-    if local_index < 4 {
-        let v = shared_data[local_index * 128 + 127];
-
-        shared_data[local_index * 128 + 127] += shared_data[local_index * 128 + 63];
-        shared_data[local_index * 128 + 63] = v;
-    }
-    workgroupBarrier();
-
-    if local_index < 8 {
-        let v = shared_data[local_index * 64 + 63];
-
-        shared_data[local_index * 64 + 63] += shared_data[local_index * 64 + 31];
-        shared_data[local_index * 64 + 31] = v;
-    }
-    workgroupBarrier();
-
-    if local_index < 16 {
-        let v = shared_data[local_index * 32 + 31];
-
-        shared_data[local_index * 32 + 31] += shared_data[local_index * 32 + 15];
-        shared_data[local_index * 32 + 15] = v;
-    }
-    workgroupBarrier();
-
-    if local_index < 32 {
-        let v = shared_data[local_index * 16 + 15];
-
-        shared_data[local_index * 16 + 15] += shared_data[local_index * 16 + 7];
-        shared_data[local_index * 16 + 7] = v;
-    }
-    workgroupBarrier();
-
-    if local_index < 64 {
-        let v = shared_data[local_index * 8 + 7];
-
-        shared_data[local_index * 8 + 7] += shared_data[local_index * 8 + 3];
-        shared_data[local_index * 8 + 3] = v;
-    }
-    workgroupBarrier();
-
-    if local_index < 128 {
-        let v = shared_data[local_index * 4 + 3];
-
-        shared_data[local_index * 4 + 3] += shared_data[local_index * 4 + 1];
-        shared_data[local_index * 4 + 1] = v;
-    }
-    workgroupBarrier();
-
-    let v = shared_data[local_index * 2 + 1];
-
-    shared_data[local_index * 2 + 1] += shared_data[local_index * 2];
-    shared_data[local_index * 2] = v;
 
     let uniform_group_index = workgroupUniformLoad(&group_index);
 

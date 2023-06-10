@@ -10,7 +10,10 @@ use empa::type_flag::{O, X};
 use empa::{abi, buffer};
 use zeroable::Zeroable;
 
-const SEGMENT_SIZE: u32 = 512;
+const GROUPS_SIZE: u32 = 256;
+const VALUES_PER_THREAD: u32 = 8;
+
+const SEGMENT_SIZE: u32 = GROUPS_SIZE * VALUES_PER_THREAD;
 
 const SHADER_U32: ShaderSource = shader_source!("shader_u32.wgsl");
 const SHADER_I32: ShaderSource = shader_source!("shader_i32.wgsl");

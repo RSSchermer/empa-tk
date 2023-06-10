@@ -1,7 +1,8 @@
 [workspace]
 members = [
     "empa-tk",
-    "examples/web/prefix_sum",
+    "examples/web/prefix_sum_exclusive",
+    "examples/web/prefix_sum_inclusive",
     "examples/web/radix_sort",
     "examples/web/radix_sort_by"
 ]

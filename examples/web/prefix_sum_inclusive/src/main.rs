@@ -7,7 +7,7 @@ use empa::arwa::{NavigatorExt, RequestAdapterOptions};
 use empa::buffer;
 use empa::buffer::Buffer;
 use empa::device::DeviceDescriptor;
-use empa_tk::prefix_sum::PrefixSum;
+use empa_tk::prefix_sum::{PrefixSumExclusive, PrefixSumInclusive};
 use futures::FutureExt;
 
 fn main() {
@@ -29,7 +29,7 @@ async fn compute() -> Result<(), Box<dyn Error>> {
         })
         .await?;
 
-    let mut evaluator = PrefixSum::init_u32(device.clone());
+    let mut evaluator = PrefixSumInclusive::init_u32(device.clone());
 
     let count = 1_000_000;
     let data: Vec<u32> = vec![1; count];

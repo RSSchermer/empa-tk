@@ -71,12 +71,13 @@ async fn compute() -> Result<(), Box<dyn Error>> {
             keys: keys_buffer.view(),
             values: values_buffer.view(),
             temporary_key_storage: temp_key_storage_buffer.view(),
-            temporary_value_storage: temp_value_storage_buffer.view()
+            temporary_value_storage: temp_value_storage_buffer.view(),
         },
     );
     encoder = encoder.write_timestamp(&timestamp_query_set, 1);
 
-    encoder = encoder.copy_buffer_to_buffer_slice(values_buffer.view(), value_readback_buffer.view());
+    encoder =
+        encoder.copy_buffer_to_buffer_slice(values_buffer.view(), value_readback_buffer.view());
 
     encoder = encoder.resolve_timestamp_query_set(&timestamp_query_set, 0, timestamps.view());
     encoder = encoder.copy_buffer_to_buffer_slice(timestamps.view(), timestamps_readback.view());

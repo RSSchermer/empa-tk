@@ -29,9 +29,15 @@ async fn compute() -> Result<(), Box<dyn Error>> {
         })
         .await?;
 
+    let count = 1_000_000;
+
+    console::log!(
+        "Evaluating an exclusive prefix-sum over a list of %i `1`s.",
+        count
+    );
+
     let mut evaluator = PrefixSumExclusive::init_u32(device.clone());
 
-    let count = 1_000_000;
     let data: Vec<u32> = vec![1; count];
 
     let data_buffer: Buffer<[u32], _> =
@@ -61,11 +67,19 @@ async fn compute() -> Result<(), Box<dyn Error>> {
     {
         let data = readback_buffer.mapped();
 
-        console::log!("The first 10 numbers:", format!("{:#?}", &data[..10]));
+        console::log!("The first 10 numbers:", format!("{:#?}", &data[..10000]));
         console::log!(
             "The last 10 numbers:",
             format!("{:#?}", &data[data.len() - 10..])
         );
+
+        console::log!("Asserting the values computed on the GPU match the expected values...");
+
+        for i in 0..count {
+            assert_eq!(data[i], i as u32);
+        }
+
+        console::log!("...successfully!");
     }
 
     readback_buffer.unmap();

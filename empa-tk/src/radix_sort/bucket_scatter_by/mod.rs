@@ -115,8 +115,27 @@ where
     K: abi::Sized,
     V: abi::Sized,
 {
-    fn init_internal(device: Device, shader_source: &ShaderSource) -> Self {
-        let shader = device.create_shader_module(shader_source);
+    fn init_internal(device: Device, shader_template: &str) -> Self {
+        let size = mem::size_of::<V>();
+
+        if size.rem(4) != 0 {
+            panic!("Expected an `abi::Sized` type's size to be a multiple of 4")
+        }
+
+        let mut code = String::new();
+
+        write!(code, "struct VALUE_TYPE {{").unwrap();
+
+        let field_count = size / 4;
+
+        for i in 0..field_count {
+            write!(code, "    field_{}: u32,\n", i).unwrap();
+        }
+
+        write!(code, "}}\n\n{}", shader_template).unwrap();
+
+        let shader_source = ShaderSource::parse(code).unwrap();
+        let shader = device.create_shader_module(&shader_source);
 
         let bind_group_layout = device.create_bind_group_layout::<ResourcesLayout<K, V>>();
         let pipeline_layout = device.create_pipeline_layout(&bind_group_layout);
@@ -217,26 +236,6 @@ where
     V: abi::Sized,
 {
     pub fn init_u32(device: Device) -> Self {
-        let size = mem::size_of::<V>();
-
-        if size.rem(4) != 0 {
-            panic!("Expected an `abi::Sized` type's size to be a multiple of 4")
-        }
-
-        let mut code = String::new();
-
-        write!(code, "struct VALUE_TYPE {{").unwrap();
-
-        let field_count = size / 4;
-
-        for i in 0..field_count {
-            write!(code, "    field_{}: u32,\n", i).unwrap();
-        }
-
-        write!(code, "}}\n\n{}", SHADER_TEMPLATE_U32).unwrap();
-
-        let shader_source = ShaderSource::parse(code).unwrap();
-
-        Self::init_internal(device, &shader_source)
+        Self::init_internal(device, SHADER_TEMPLATE_U32)
     }
 }

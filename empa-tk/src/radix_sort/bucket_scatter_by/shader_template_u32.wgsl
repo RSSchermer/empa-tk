@@ -25,10 +25,10 @@ var<storage, read> keys_in: array<u32>;
 var<storage, read_write> keys_out: array<u32>;
 
 @group(0) @binding(3)
-var<storage, read> values_in: array<u32>;
+var<storage, read> values_in: array<VALUE_TYPE>;
 
 @group(0) @binding(4)
-var<storage, read_write> values_out: array<u32>;
+var<storage, read_write> values_out: array<VALUE_TYPE>;
 
 @group(0) @binding(5)
 var<storage, read> global_base_bucket_offsets: array<array<u32, RADIX_DIGITS>, RADIX_GROUPS>;
@@ -43,7 +43,7 @@ var<workgroup> segment_index: u32;
 
 var<workgroup> local_keys: array<u32, SEGMENT_SIZE>;
 
-var<workgroup> local_values: array<u32, SEGMENT_SIZE>;
+var<workgroup> local_value_indices: array<u32, SEGMENT_SIZE>;
 
 var<workgroup> workspace: array<u32, SEGMENT_SIZE>;
 
@@ -98,7 +98,7 @@ fn sort_local_data(local_index: u32) {
 
         var output_indices: array<u32, VALUES_PER_THREAD>;
         var keys: array<u32, VALUES_PER_THREAD>;
-        var values: array<u32, VALUES_PER_THREAD>;
+        var value_indices: array<u32, VALUES_PER_THREAD>;
 
         for (var j = 0u; j < VALUES_PER_THREAD; j += 1) {
             let index = j * GROUP_SIZE + local_index;
@@ -116,7 +116,7 @@ fn sort_local_data(local_index: u32) {
             // Move the local_keys value to its new position. First let all threads read their current into `function`
             // memory, wait for all threads to be done reading, then all threads move their value to the new position.
             keys[j] = local_keys[index];
-            values[j] = local_values[index];
+            value_indices[j] = local_value_indices[index];
         }
 
         workgroupBarrier();
@@ -125,7 +125,7 @@ fn sort_local_data(local_index: u32) {
             let index = j * GROUP_SIZE + local_index;
 
             local_keys[output_indices[j]] = keys[j];
-            local_values[output_indices[j]] = values[j];
+            local_value_indices[output_indices[j]] = value_indices[j];
         }
 
         workgroupBarrier();
@@ -150,7 +150,7 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
     for (var i = local_index; i < SEGMENT_SIZE; i += GROUP_SIZE) {
         if i < data_size {
             local_keys[i] = keys_in[segment_offset + i];
-            local_values[i] = values_in[segment_offset + i];
+            local_value_indices[i] = i;
         } else {
             local_keys[i] = 0xFFFFFFFFu;
         }
@@ -316,7 +316,10 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
 
         if index < data_size {
             keys_out[output_index] = local_keys[index];
-            values_out[output_index] = local_values[index];
+
+            let value_in_index = segment_offset + local_value_indices[index];
+
+            values_out[output_index] = values_in[value_in_index];
         }
     }
 }

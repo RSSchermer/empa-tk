@@ -1,4 +1,6 @@
-use std::fmt;
+use std::fmt::Write;
+use std::ops::Rem;
+use std::{fmt, mem};
 
 use empa::buffer::{Buffer, ReadOnlyStorage, Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
@@ -7,14 +9,14 @@ use empa::compute_pipeline::{
 };
 use empa::device::Device;
 use empa::resource_binding::BindGroupLayout;
-use empa::shader_module::{shader_source, ShaderSource};
+use empa::shader_module::ShaderSource;
 use empa::type_flag::{O, X};
 use empa::{abi, buffer};
 use zeroable::Zeroable;
 
 use crate::radix_sort::{RADIX_DIGITS, RADIX_GROUPS, RADIX_SIZE};
 
-const SHADER_U32_U32: ShaderSource = shader_source!("shader_u32_u32.wgsl");
+const SHADER_TEMPLATE_U32: &str = include_str!("shader_template_u32.wgsl");
 
 const GROUP_SIZE: u32 = 256;
 const VALUES_PER_THREAD: u32 = 4;
@@ -119,12 +121,15 @@ where
         let bind_group_layout = device.create_bind_group_layout::<ResourcesLayout<K, V>>();
         let pipeline_layout = device.create_pipeline_layout(&bind_group_layout);
 
-        let pipeline = device.create_compute_pipeline(
-            &ComputePipelineDescriptorBuilder::begin()
-                .layout(&pipeline_layout)
-                .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
-                .finish(),
-        );
+        let pipeline = unsafe {
+            device.create_compute_pipeline(
+                &ComputePipelineDescriptorBuilder::begin()
+                    .layout(&pipeline_layout)
+                    .compute_unchecked(&ComputeStageBuilder::begin(&shader, "main").finish())
+                    .finish(),
+            )
+        };
+
         let group_state =
             device.create_slice_buffer_zeroed(1, buffer::Usages::storage_binding().and_copy_dst());
         let group_counter =
@@ -207,8 +212,31 @@ where
     }
 }
 
-impl BucketScatterBy<u32, u32> {
-    pub fn init_keys_u32_values_u32(device: Device) -> Self {
-        Self::init_internal(device, &SHADER_U32_U32)
+impl<V> BucketScatterBy<u32, V>
+where
+    V: abi::Sized,
+{
+    pub fn init_u32(device: Device) -> Self {
+        let size = mem::size_of::<V>();
+
+        if size.rem(4) != 0 {
+            panic!("Expected an `abi::Sized` type's size to be a multiple of 4")
+        }
+
+        let mut code = String::new();
+
+        write!(code, "struct VALUE_TYPE {{").unwrap();
+
+        let field_count = size / 4;
+
+        for i in 0..field_count {
+            write!(code, "    field_{}: u32,\n", i).unwrap();
+        }
+
+        write!(code, "}}\n\n{}", SHADER_TEMPLATE_U32).unwrap();
+
+        let shader_source = ShaderSource::parse(code).unwrap();
+
+        Self::init_internal(device, &shader_source)
     }
 }

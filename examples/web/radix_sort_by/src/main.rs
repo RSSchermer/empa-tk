@@ -4,11 +4,19 @@ use arwa::console;
 use arwa::window::window;
 use empa::adapter::Features;
 use empa::arwa::{NavigatorExt, RequestAdapterOptions};
-use empa::buffer;
 use empa::buffer::Buffer;
 use empa::device::DeviceDescriptor;
+use empa::{abi, buffer};
 use empa_tk::radix_sort::{RadixSortBy, RadixSortByInput};
 use futures::FutureExt;
+use zeroable::Zeroable;
+
+#[derive(abi::Sized, Clone, Copy, PartialEq, Default, Debug, Zeroable)]
+#[repr(C)]
+struct MyValue {
+    field_a: u32,
+    field_b: f32,
+}
 
 fn main() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -30,7 +38,7 @@ async fn compute() -> Result<(), Box<dyn Error>> {
         })
         .await?;
 
-    let mut radix_sort_by = RadixSortBy::init_keys_u32_values_u32(device.clone());
+    let mut radix_sort_by = RadixSortBy::init_u32(device.clone());
 
     let count = 1_000_000;
 
@@ -38,24 +46,27 @@ async fn compute() -> Result<(), Box<dyn Error>> {
 
     let mut rng = oorandom::Rand32::new(1);
     let mut keys: Vec<u32> = Vec::with_capacity(count);
-    let mut values: Vec<u32> = Vec::with_capacity(count);
+    let mut values: Vec<MyValue> = Vec::with_capacity(count);
 
-    for _ in 0..count {
+    for i in 0..count {
         keys.push(rng.rand_u32());
-        values.push(rng.rand_u32());
+        values.push(MyValue {
+            field_a: i as u32,
+            field_b: i as f32,
+        });
     }
 
     let keys_buffer: Buffer<[u32], _> =
         device.create_buffer(&*keys, buffer::Usages::storage_binding().and_copy_src());
     let temp_key_storage_buffer: Buffer<[u32], _> =
         device.create_slice_buffer_zeroed(count, buffer::Usages::storage_binding().and_copy_src());
-    let values_buffer: Buffer<[u32], _> =
+    let values_buffer: Buffer<[MyValue], _> =
         device.create_buffer(&*values, buffer::Usages::storage_binding().and_copy_src());
-    let temp_value_storage_buffer: Buffer<[u32], _> =
+    let temp_value_storage_buffer: Buffer<[MyValue], _> =
         device.create_slice_buffer_zeroed(count, buffer::Usages::storage_binding().and_copy_src());
 
-    let value_readback_buffer: Buffer<[u32], _> =
-        device.create_buffer(vec![0; count], buffer::Usages::map_read().and_copy_dst());
+    let value_readback_buffer: Buffer<[MyValue], _> =
+        device.create_slice_buffer_zeroed(count, buffer::Usages::map_read().and_copy_dst());
     let timestamp_query_set = device.create_timestamp_query_set(2);
     let timestamps =
         device.create_slice_buffer_zeroed(2, buffer::Usages::query_resolve().and_copy_src());

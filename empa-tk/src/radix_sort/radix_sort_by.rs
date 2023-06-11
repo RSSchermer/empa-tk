@@ -121,14 +121,17 @@ where
     }
 }
 
-impl RadixSortBy<u32, u32> {
-    pub fn init_keys_u32_values_u32(device: Device) -> Self {
+impl<V> RadixSortBy<u32, V>
+where
+    V: abi::Sized,
+{
+    pub fn init_u32(device: Device) -> Self {
         let global_bucket_data =
             device.create_buffer_zeroed(buffer::Usages::storage_binding().and_copy_dst());
 
         let bucket_histogram = BucketHistogram::init_u32(device.clone());
         let global_bucket_offsets = GlobalBucketOffsets::init(device.clone());
-        let bucket_scatter_by = BucketScatterBy::init_keys_u32_values_u32(device);
+        let bucket_scatter_by = BucketScatterBy::init_u32(device);
 
         RadixSortBy {
             bucket_histogram,

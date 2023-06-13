@@ -7,7 +7,7 @@ use empa::arwa::{NavigatorExt, RequestAdapterOptions};
 use empa::buffer;
 use empa::buffer::Buffer;
 use empa::device::DeviceDescriptor;
-use empa_tk::find_runs::{FindRuns, FindRunsInput};
+use empa_tk::find_runs::{FindRuns, FindRunsOutput};
 use futures::FutureExt;
 
 fn main() {
@@ -46,21 +46,22 @@ async fn compute() -> Result<(), Box<dyn Error>> {
 
     let data_buffer: Buffer<[u32], _> =
         device.create_buffer(data, buffer::Usages::storage_binding().and_copy_src());
-    let temporary_storage_buffer: Buffer<[u32], _> = device.create_slice_buffer_zeroed(
+
+    let run_count_buffer: Buffer<u32, _> =
+        device.create_buffer_zeroed(buffer::Usages::storage_binding().and_copy_src());
+    let run_starts_buffer: Buffer<[u32], _> =
+        device.create_slice_buffer_zeroed(total, buffer::Usages::storage_binding().and_copy_src());
+    let run_mapping_buffer: Buffer<[u32], _> = device.create_slice_buffer_zeroed(
         total,
         buffer::Usages::storage_binding()
             .and_copy_dst()
             .and_copy_src(),
     );
-    let run_starts_buffer: Buffer<[u32], _> =
-        device.create_slice_buffer_zeroed(total, buffer::Usages::storage_binding().and_copy_src());
-    let run_count_buffer: Buffer<u32, _> =
-        device.create_buffer_zeroed(buffer::Usages::storage_binding().and_copy_src());
 
-    let run_starts_readback_buffer: Buffer<[u32], _> =
-        device.create_slice_buffer_zeroed(total, buffer::Usages::map_read().and_copy_dst());
     let run_count_readback_buffer: Buffer<u32, _> =
         device.create_buffer_zeroed(buffer::Usages::map_read().and_copy_dst());
+    let run_starts_readback_buffer: Buffer<[u32], _> =
+        device.create_slice_buffer_zeroed(total, buffer::Usages::map_read().and_copy_dst());
 
     let timestamp_query_set = device.create_timestamp_query_set(2);
     let timestamps =
@@ -73,11 +74,11 @@ async fn compute() -> Result<(), Box<dyn Error>> {
     encoder = encoder.write_timestamp(&timestamp_query_set, 0);
     encoder = find_runs.encode(
         encoder,
-        FindRunsInput {
-            data: data_buffer.view(),
-            temporary_storage: temporary_storage_buffer.view(),
-            run_starts: run_starts_buffer.view(),
+        data_buffer.view(),
+        FindRunsOutput {
             run_count: run_count_buffer.view(),
+            run_starts: run_starts_buffer.view(),
+            run_mapping: run_mapping_buffer.view(),
         },
     );
     encoder = encoder.write_timestamp(&timestamp_query_set, 1);

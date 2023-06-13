@@ -11,11 +11,10 @@ mod collect_run_starts;
 mod mark_run_starts;
 mod resolve_run_count;
 
-pub struct FindRunsInput<'a, T, U0, U1, U2, U3> {
-    pub data: buffer::View<'a, [T], U0>,
-    pub temporary_storage: buffer::View<'a, [u32], U1>,
-    pub run_starts: buffer::View<'a, [u32], U2>,
-    pub run_count: buffer::View<'a, u32, U3>,
+pub struct FindRunsOutput<'a, U0, U1, U2> {
+    pub run_count: buffer::View<'a, u32, U0>,
+    pub run_starts: buffer::View<'a, [u32], U1>,
+    pub run_mapping: buffer::View<'a, [u32], U2>,
 }
 
 pub struct FindRuns<T>
@@ -35,40 +34,40 @@ where
     pub fn encode<U0, U1, U2, U3>(
         &mut self,
         mut encoder: CommandEncoder,
-        input: FindRunsInput<T, U0, U1, U2, U3>,
+        input: buffer::View<[T], U0>,
+        output: FindRunsOutput<U1, U2, U3>,
     ) -> CommandEncoder
     where
         U0: buffer::StorageBinding,
-        U1: buffer::StorageBinding + buffer::CopyDst + 'static,
+        U1: buffer::StorageBinding,
         U2: buffer::StorageBinding,
-        U3: buffer::StorageBinding,
+        U3: buffer::StorageBinding + buffer::CopyDst + 'static,
     {
-        let FindRunsInput {
-            data,
-            temporary_storage,
-            run_starts,
+        let FindRunsOutput {
             run_count,
-        } = input;
+            run_starts,
+            run_mapping,
+        } = output;
 
         encoder = self.mark_run_starts.encode(
             encoder,
             MarkRunStartsInput {
-                data,
-                temporary_storage,
+                data: input,
+                temporary_storage: run_mapping,
             },
         );
-        encoder = self.prefix_sum_inclusive.encode(encoder, temporary_storage);
+        encoder = self.prefix_sum_inclusive.encode(encoder, run_mapping);
         encoder = self.collect_run_starts.encode(
             encoder,
             CollectRunStartsInput {
-                temporary_storage,
+                temporary_storage: run_mapping,
                 run_starts,
             },
         );
         encoder = self.resolve_run_count.encode(
             encoder,
             ResolveRunCountInput {
-                temporary_storage,
+                temporary_storage: run_mapping,
                 run_count,
             },
         );

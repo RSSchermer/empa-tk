@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "A collection of Empa GPGPU kernel primitives for device level parallel operations."
 authors = ["RSSchermer <roland0507@gmail.com>"]
 edition = "2021"
+license = "MIT"
 
 [dependencies]
 empa = { version = "0.1.0", path = "../../glitz/empa" }

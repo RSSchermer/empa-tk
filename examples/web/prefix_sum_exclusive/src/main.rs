@@ -67,7 +67,7 @@ async fn compute() -> Result<(), Box<dyn Error>> {
     {
         let data = readback_buffer.mapped();
 
-        console::log!("The first 10 numbers:", format!("{:#?}", &data[..10000]));
+        console::log!("The first 10 numbers:", format!("{:#?}", &data[..10]));
         console::log!(
             "The last 10 numbers:",
             format!("{:#?}", &data[data.len() - 10..])

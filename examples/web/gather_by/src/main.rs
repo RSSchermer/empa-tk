@@ -7,9 +7,8 @@ use empa::arwa::{NavigatorExt, RequestAdapterOptions};
 use empa::buffer;
 use empa::buffer::Buffer;
 use empa::device::DeviceDescriptor;
-use empa_tk::prefix_sum::PrefixSumInclusive;
-use futures::FutureExt;
 use empa_tk::gather_by::{GatherBy, GatherByInput};
+use futures::FutureExt;
 
 fn main() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -47,8 +46,7 @@ async fn compute() -> Result<(), Box<dyn Error>> {
 
     let data_buffer: Buffer<[u32], _> =
         device.create_buffer(data, buffer::Usages::storage_binding());
-    let by_buffer: Buffer<[u32], _> =
-        device.create_buffer(by, buffer::Usages::storage_binding());
+    let by_buffer: Buffer<[u32], _> = device.create_buffer(by, buffer::Usages::storage_binding());
     let output_buffer: Buffer<[u32], _> =
         device.create_slice_buffer_zeroed(count, buffer::Usages::storage_binding().and_copy_src());
     let readback_buffer: Buffer<[u32], _> =
@@ -62,10 +60,14 @@ async fn compute() -> Result<(), Box<dyn Error>> {
     let mut encoder = device.create_command_encoder();
 
     encoder = encoder.write_timestamp(&timestamp_query_set, 0);
-    encoder = gather_by.encode(encoder, GatherByInput {
-        gather_by: by_buffer.view(),
-        data: data_buffer.view()
-    }, output_buffer.view());
+    encoder = gather_by.encode(
+        encoder,
+        GatherByInput {
+            gather_by: by_buffer.view(),
+            data: data_buffer.view(),
+        },
+        output_buffer.view(),
+    );
     encoder = encoder.write_timestamp(&timestamp_query_set, 1);
 
     encoder = encoder.copy_buffer_to_buffer_slice(output_buffer.view(), readback_buffer.view());

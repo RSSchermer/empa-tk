@@ -1,6 +1,6 @@
+use std::fmt::Write;
 use std::mem;
 use std::ops::Rem;
-use std::fmt::Write;
 
 pub fn write_value_type<V>(s: &mut String) {
     let size = mem::size_of::<V>();

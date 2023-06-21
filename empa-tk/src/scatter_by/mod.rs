@@ -18,9 +18,9 @@ const GROUP_SIZE: u32 = 256;
 
 #[derive(empa::resource_binding::Resources)]
 struct Resources<B, V>
-    where
-        B: abi::Sized,
-        V: abi::Sized,
+where
+    B: abi::Sized,
+    V: abi::Sized,
 {
     #[resource(binding = 0, visibility = "COMPUTE")]
     scatter_by: ReadOnlyStorage<[B]>,
@@ -38,9 +38,9 @@ pub struct ScatterByInput<'a, B, V, U0, U1> {
 }
 
 pub struct ScatterBy<B, V>
-    where
-        B: abi::Sized,
-        V: abi::Sized,
+where
+    B: abi::Sized,
+    V: abi::Sized,
 {
     device: Device,
     bind_group_layout: BindGroupLayout<ResourcesLayout<B, V>>,
@@ -48,9 +48,9 @@ pub struct ScatterBy<B, V>
 }
 
 impl<B, V> ScatterBy<B, V>
-    where
-        B: abi::Sized,
-        V: abi::Sized,
+where
+    B: abi::Sized,
+    V: abi::Sized,
 {
     fn init_internal(device: Device, by_type: &str, shader_template: &str) -> Self {
         let mut code = String::new();
@@ -85,16 +85,14 @@ impl<B, V> ScatterBy<B, V>
         &mut self,
         encoder: CommandEncoder,
         input: ScatterByInput<B, V, U0, U1>,
-        output: buffer::View<[V], U2>
+        output: buffer::View<[V], U2>,
     ) -> CommandEncoder
-        where
-            U0: buffer::StorageBinding,
-            U1: buffer::StorageBinding,
-            U2: buffer::StorageBinding,
+    where
+        U0: buffer::StorageBinding,
+        U1: buffer::StorageBinding,
+        U2: buffer::StorageBinding,
     {
-        let ScatterByInput {
-            scatter_by, data
-        } = input;
+        let ScatterByInput { scatter_by, data } = input;
 
         let workgroups = (scatter_by.len() as u32).div_ceil(GROUP_SIZE);
 
@@ -103,7 +101,7 @@ impl<B, V> ScatterBy<B, V>
             Resources {
                 scatter_by: scatter_by.read_only_storage(),
                 data_in: data.read_only_storage(),
-                data_out: output.storage()
+                data_out: output.storage(),
             },
         );
 
@@ -121,8 +119,8 @@ impl<B, V> ScatterBy<B, V>
 }
 
 impl<V> ScatterBy<u32, V>
-    where
-        V: abi::Sized,
+where
+    V: abi::Sized,
 {
     pub fn init_u32(device: Device) -> Self {
         Self::init_internal(device, "u32", SHADER_TEMPLATE)
@@ -130,8 +128,8 @@ impl<V> ScatterBy<u32, V>
 }
 
 impl<V> ScatterBy<i32, V>
-    where
-        V: abi::Sized,
+where
+    V: abi::Sized,
 {
     pub fn init_i32(device: Device) -> Self {
         Self::init_internal(device, "i32", SHADER_TEMPLATE)

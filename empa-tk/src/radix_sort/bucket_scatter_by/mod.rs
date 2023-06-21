@@ -1,5 +1,5 @@
+use std::fmt;
 use std::fmt::Write;
-use std::{fmt};
 
 use empa::buffer::{Buffer, ReadOnlyStorage, Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};

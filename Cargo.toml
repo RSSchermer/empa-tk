@@ -2,6 +2,7 @@
 members = [
     "empa-tk",
     "examples/web/find_runs",
+    "examples/web/gather_by",
     "examples/web/prefix_sum_exclusive",
     "examples/web/prefix_sum_inclusive",
     "examples/web/radix_sort",

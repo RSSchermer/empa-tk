@@ -1,6 +1,5 @@
 use std::fmt::Write;
-use std::ops::Rem;
-use std::{fmt, mem};
+use std::{fmt};
 
 use empa::buffer::{Buffer, ReadOnlyStorage, Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
@@ -15,6 +14,7 @@ use empa::{abi, buffer};
 use zeroable::Zeroable;
 
 use crate::radix_sort::{RADIX_DIGITS, RADIX_GROUPS, RADIX_SIZE};
+use crate::write_value_type::write_value_type;
 
 const SHADER_TEMPLATE_U32: &str = include_str!("shader_template_u32.wgsl");
 
@@ -116,23 +116,11 @@ where
     V: abi::Sized,
 {
     fn init_internal(device: Device, shader_template: &str) -> Self {
-        let size = mem::size_of::<V>();
-
-        if size.rem(4) != 0 {
-            panic!("Expected an `abi::Sized` type's size to be a multiple of 4")
-        }
-
         let mut code = String::new();
 
-        write!(code, "struct VALUE_TYPE {{").unwrap();
+        write_value_type::<V>(&mut code);
 
-        let field_count = size / 4;
-
-        for i in 0..field_count {
-            write!(code, "    field_{}: u32,\n", i).unwrap();
-        }
-
-        write!(code, "}}\n\n{}", shader_template).unwrap();
+        write!(code, "{}", shader_template).unwrap();
 
         let shader_source = ShaderSource::parse(code).unwrap();
         let shader = device.create_shader_module(&shader_source);

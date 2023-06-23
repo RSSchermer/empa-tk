@@ -1,5 +1,2 @@
-mod exclusive;
-pub use self::exclusive::*;
-
-mod inclusive;
-pub use self::inclusive::*;
+mod prefix_sum;
+pub use prefix_sum::{PrefixSum, PrefixSumInput};

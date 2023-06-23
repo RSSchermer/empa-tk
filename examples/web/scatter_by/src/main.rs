@@ -31,7 +31,7 @@ async fn compute() -> Result<(), Box<dyn Error>> {
 
     let count = 1_000_000;
 
-    console::log!("Scattering a list of numbers...", count);
+    console::log!("Scattering a list of numbers...");
 
     let mut data: Vec<u32> = Vec::with_capacity(count);
     let mut by: Vec<u32> = Vec::with_capacity(count);
@@ -64,6 +64,7 @@ async fn compute() -> Result<(), Box<dyn Error>> {
         ScatterByInput {
             scatter_by: by_buffer.view(),
             data: data_buffer.view(),
+            count: None,
         },
         output_buffer.view(),
     );

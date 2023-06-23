@@ -1,4 +1,4 @@
-use empa::buffer::{ReadOnlyStorage, Storage, Uniform};
+use empa::buffer::{Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
     ComputePipeline, ComputePipelineDescriptorBuilder, ComputeStageBuilder,
@@ -10,24 +10,24 @@ use empa::shader_module::{shader_source, ShaderSource};
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-pub struct ResolveRunCountResources {
+pub struct GenerateDispatchResources {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    pub count: Uniform<u32>,
+    pub group_size: Uniform<u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    pub temporary_storage: ReadOnlyStorage<[u32]>,
+    pub count: Uniform<u32>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    pub run_count: Storage<u32>,
+    pub dispatch: Storage<DispatchWorkgroups>,
 }
 
-type ResourcesLayout = <ResolveRunCountResources as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout = <GenerateDispatchResources as empa::resource_binding::Resources>::Layout;
 
-pub struct ResolveRunCount {
+pub struct GenerateDispatch {
     device: Device,
     bind_group_layout: BindGroupLayout<ResourcesLayout>,
     pipeline: ComputePipeline<(ResourcesLayout,)>,
 }
 
-impl ResolveRunCount {
+impl GenerateDispatch {
     pub fn init(device: Device) -> Self {
         let shader = device.create_shader_module(&SHADER);
 
@@ -41,7 +41,7 @@ impl ResolveRunCount {
                 .finish(),
         );
 
-        ResolveRunCount {
+        GenerateDispatch {
             device,
             bind_group_layout,
             pipeline,
@@ -51,7 +51,7 @@ impl ResolveRunCount {
     pub fn encode(
         &self,
         encoder: CommandEncoder,
-        resources: ResolveRunCountResources,
+        resources: GenerateDispatchResources,
     ) -> CommandEncoder {
         let bind_group = self
             .device

@@ -65,6 +65,7 @@ async fn compute() -> Result<(), Box<dyn Error>> {
         GatherByInput {
             gather_by: by_buffer.view(),
             data: data_buffer.view(),
+            count: None,
         },
         output_buffer.view(),
     );

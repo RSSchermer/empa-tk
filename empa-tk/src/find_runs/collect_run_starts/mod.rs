@@ -1,5 +1,5 @@
 use empa::buffer;
-use empa::buffer::{ReadOnlyStorage, Storage};
+use empa::buffer::{ReadOnlyStorage, Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
     ComputePipeline, ComputePipelineDescriptorBuilder, ComputeStageBuilder,
@@ -8,24 +8,21 @@ use empa::device::Device;
 use empa::resource_binding::BindGroupLayout;
 use empa::shader_module::{shader_source, ShaderSource};
 
-const GROUPS_SIZE: u32 = 256;
+use crate::find_runs::GROUPS_SIZE;
 
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-struct Resources {
+pub struct CollectRunStartsResources {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    temporary_storage: ReadOnlyStorage<[u32]>,
+    pub count: Uniform<u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    run_starts: Storage<[u32]>,
+    pub temporary_storage: ReadOnlyStorage<[u32]>,
+    #[resource(binding = 2, visibility = "COMPUTE")]
+    pub run_starts: Storage<[u32]>,
 }
 
-type ResourcesLayout = <Resources as empa::resource_binding::Resources>::Layout;
-
-pub struct CollectRunStartsInput<'a, U0, U1> {
-    pub temporary_storage: buffer::View<'a, [u32], U0>,
-    pub run_starts: buffer::View<'a, [u32], U1>,
-}
+type ResourcesLayout = <CollectRunStartsResources as empa::resource_binding::Resources>::Layout;
 
 pub struct CollectRunStarts {
     device: Device,
@@ -54,39 +51,36 @@ impl CollectRunStarts {
         }
     }
 
-    pub fn encode<U0, U1>(
+    pub fn encode<U>(
         &self,
         encoder: CommandEncoder,
-        input: CollectRunStartsInput<U0, U1>,
+        resources: CollectRunStartsResources,
+        dispatch_indirect: bool,
+        dispatch: buffer::View<DispatchWorkgroups, U>,
+        fallback_count: u32,
     ) -> CommandEncoder
     where
-        U0: buffer::StorageBinding,
-        U1: buffer::StorageBinding,
+        U: buffer::Indirect,
     {
-        let CollectRunStartsInput {
-            temporary_storage,
-            run_starts,
-        } = input;
+        let bind_group = self
+            .device
+            .create_bind_group(&self.bind_group_layout, resources);
 
-        let workgroups = (temporary_storage.len() as u32).div_ceil(GROUPS_SIZE);
-
-        let bind_group = self.device.create_bind_group(
-            &self.bind_group_layout,
-            Resources {
-                temporary_storage: temporary_storage.read_only_storage(),
-                run_starts: run_starts.storage(),
-            },
-        );
-
-        encoder
+        let encoder = encoder
             .begin_compute_pass()
             .set_pipeline(&self.pipeline)
-            .set_bind_groups(&bind_group)
-            .dispatch_workgroups(DispatchWorkgroups {
-                count_x: workgroups,
-                count_y: 1,
-                count_z: 1,
-            })
-            .end()
+            .set_bind_groups(&bind_group);
+
+        if dispatch_indirect {
+            encoder.dispatch_workgroups_indirect(dispatch).end()
+        } else {
+            encoder
+                .dispatch_workgroups(DispatchWorkgroups {
+                    count_x: fallback_count.div_ceil(GROUPS_SIZE),
+                    count_y: 1,
+                    count_z: 1,
+                })
+                .end()
+        }
     }
 }

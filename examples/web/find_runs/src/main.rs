@@ -7,7 +7,7 @@ use empa::arwa::{NavigatorExt, RequestAdapterOptions};
 use empa::buffer;
 use empa::buffer::Buffer;
 use empa::device::DeviceDescriptor;
-use empa_tk::find_runs::{FindRuns, FindRunsOutput};
+use empa_tk::find_runs::{FindRuns, FindRunsInput, FindRunsOutput};
 use futures::FutureExt;
 
 fn main() {
@@ -74,7 +74,10 @@ async fn compute() -> Result<(), Box<dyn Error>> {
     encoder = encoder.write_timestamp(&timestamp_query_set, 0);
     encoder = find_runs.encode(
         encoder,
-        data_buffer.view(),
+        FindRunsInput {
+            data: data_buffer.view(),
+            count: None,
+        },
         FindRunsOutput {
             run_count: run_count_buffer.view(),
             run_starts: run_starts_buffer.view(),

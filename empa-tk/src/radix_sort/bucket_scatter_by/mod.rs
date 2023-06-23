@@ -21,7 +21,7 @@ const SHADER_TEMPLATE_U32: &str = include_str!("shader_template_u32.wgsl");
 const GROUP_SIZE: u32 = 256;
 const VALUES_PER_THREAD: u32 = 4;
 
-const SEGMENT_SIZE: u32 = GROUP_SIZE * VALUES_PER_THREAD;
+pub const BUCKET_SCATTER_BY_SEGMENT_SIZE: u32 = GROUP_SIZE * VALUES_PER_THREAD;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(u32)]
@@ -70,32 +70,38 @@ where
     V: abi::Sized,
 {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    uniforms: Uniform<Uniforms>,
+    count: Uniform<u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    keys_in: ReadOnlyStorage<[K]>,
+    uniforms: Uniform<Uniforms>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    keys_out: Storage<[K]>,
+    keys_in: ReadOnlyStorage<[K]>,
     #[resource(binding = 3, visibility = "COMPUTE")]
-    values_in: ReadOnlyStorage<[V]>,
+    keys_out: Storage<[K]>,
     #[resource(binding = 4, visibility = "COMPUTE")]
-    values_out: Storage<[V]>,
+    values_in: ReadOnlyStorage<[V]>,
     #[resource(binding = 5, visibility = "COMPUTE")]
-    global_base_bucket_offsets: ReadOnlyStorage<[[u32; RADIX_DIGITS]; RADIX_GROUPS]>,
+    values_out: Storage<[V]>,
     #[resource(binding = 6, visibility = "COMPUTE")]
-    group_state: Storage<[[GroupState; RADIX_DIGITS]]>,
+    global_base_bucket_offsets: ReadOnlyStorage<[[u32; RADIX_DIGITS]; RADIX_GROUPS]>,
     #[resource(binding = 7, visibility = "COMPUTE")]
+    group_state: Storage<[[GroupState; RADIX_DIGITS]]>,
+    #[resource(binding = 8, visibility = "COMPUTE")]
     group_counter: Storage<u32>,
 }
 
 type ResourcesLayout<K, V> = <Resources<K, V> as empa::resource_binding::Resources>::Layout;
 
-pub struct BucketScatterByInput<'a, K, V, U0, U1, U2, U3, U4> {
+pub struct BucketScatterByInput<'a, K, V, U0, U1, U2, U3, U4, U5> {
     pub keys_in: buffer::View<'a, [K], U0>,
     pub keys_out: buffer::View<'a, [K], U1>,
     pub values_in: buffer::View<'a, [V], U2>,
     pub values_out: buffer::View<'a, [V], U3>,
     pub global_base_bucket_offsets: buffer::View<'a, [[u32; RADIX_DIGITS]; RADIX_GROUPS], U4>,
     pub radix_group: u32,
+    pub count: Uniform<u32>,
+    pub dispatch_indirect: bool,
+    pub dispatch: buffer::View<'a, DispatchWorkgroups, U5>,
+    pub fallback_count: u32,
 }
 
 pub struct BucketScatterBy<K, V>
@@ -151,10 +157,10 @@ where
         }
     }
 
-    pub fn encode<U0, U1, U2, U3, U4>(
+    pub fn encode<U0, U1, U2, U3, U4, U5>(
         &mut self,
         encoder: CommandEncoder,
-        input: BucketScatterByInput<K, V, U0, U1, U2, U3, U4>,
+        input: BucketScatterByInput<K, V, U0, U1, U2, U3, U4, U5>,
     ) -> CommandEncoder
     where
         U0: buffer::StorageBinding,
@@ -162,6 +168,7 @@ where
         U2: buffer::StorageBinding,
         U3: buffer::StorageBinding,
         U4: buffer::StorageBinding,
+        U5: buffer::Indirect,
     {
         let BucketScatterByInput {
             keys_in,
@@ -170,16 +177,20 @@ where
             values_out,
             global_base_bucket_offsets,
             radix_group,
+            count,
+            dispatch_indirect,
+            dispatch,
+            fallback_count,
         } = input;
 
         let radix_offset = RADIX_SIZE * radix_group;
 
-        let workgroups = (keys_in.len() as u32).div_ceil(SEGMENT_SIZE);
+        let fallback_groups = fallback_count.div_ceil(BUCKET_SCATTER_BY_SEGMENT_SIZE);
 
-        if self.group_state.len() < workgroups as usize {
+        if self.group_state.len() < fallback_groups as usize {
             self.group_state = self
                 .device
-                .create_slice_buffer_zeroed(workgroups as usize, self.group_state.usage());
+                .create_slice_buffer_zeroed(fallback_groups as usize, self.group_state.usage());
         }
 
         let uniforms = self.device.create_buffer(
@@ -193,6 +204,7 @@ where
         let bind_group = self.device.create_bind_group(
             &self.bind_group_layout,
             Resources {
+                count,
                 uniforms: uniforms.uniform(),
                 keys_in: keys_in.read_only_storage(),
                 keys_out: keys_out.storage(),
@@ -204,18 +216,24 @@ where
             },
         );
 
-        encoder
+        let encoder = encoder
             .clear_buffer(self.group_counter.view())
             .clear_buffer_slice(self.group_state.view())
             .begin_compute_pass()
             .set_pipeline(&self.pipeline)
-            .set_bind_groups(&bind_group)
-            .dispatch_workgroups(DispatchWorkgroups {
-                count_x: workgroups,
-                count_y: 1,
-                count_z: 1,
-            })
-            .end()
+            .set_bind_groups(&bind_group);
+
+        if dispatch_indirect {
+            encoder.dispatch_workgroups_indirect(dispatch).end()
+        } else {
+            encoder
+                .dispatch_workgroups(DispatchWorkgroups {
+                    count_x: fallback_groups,
+                    count_y: 1,
+                    count_z: 1,
+                })
+                .end()
+        }
     }
 }
 

@@ -16,12 +16,15 @@ struct GroupState {
 }
 
 @group(0) @binding(0)
-var<storage, read_write> data: array<DATA_TYPE>;
+var<uniform> count: u32;
 
 @group(0) @binding(1)
-var<storage, read_write> group_state: array<GroupState>;
+var<storage, read_write> data: array<DATA_TYPE>;
 
 @group(0) @binding(2)
+var<storage, read_write> group_state: array<GroupState>;
+
+@group(0) @binding(3)
 var<storage, read_write> group_counter: atomic<u32>;
 
 var<workgroup> local_data: array<DATA_TYPE, SEGMENT_SIZE>;
@@ -45,7 +48,7 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
     for (var i = local_index; i < SEGMENT_SIZE; i += GROUP_SIZE) {
         let global_index = offset + i;
 
-        if global_index < arrayLength(&data) {
+        if global_index < count {
             local_data[i] = data[global_index];
         }
     }
@@ -143,7 +146,7 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
     for (var i = local_index; i < SEGMENT_SIZE; i += GROUP_SIZE) {
         let global_index = offset + i;
 
-        if global_index < arrayLength(&data) {
+        if global_index < count {
             if OUTPUT_EXCLUSIVE {
                 var output_value = prefix;
 

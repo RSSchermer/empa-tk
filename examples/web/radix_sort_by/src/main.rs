@@ -83,6 +83,7 @@ async fn compute() -> Result<(), Box<dyn Error>> {
             values: values_buffer.view(),
             temporary_key_storage: temp_key_storage_buffer.view(),
             temporary_value_storage: temp_value_storage_buffer.view(),
+            count: None,
         },
     );
     encoder = encoder.write_timestamp(&timestamp_query_set, 1);

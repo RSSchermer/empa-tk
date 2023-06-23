@@ -19,7 +19,7 @@ const SHADER_U32: ShaderSource = shader_source!("shader_u32.wgsl");
 const GROUP_SIZE: u32 = 256;
 const VALUES_PER_THREAD: u32 = 4;
 
-const SEGMENT_SIZE: u32 = GROUP_SIZE * VALUES_PER_THREAD;
+pub const BUCKET_SCATTER_SEGMENT_SIZE: u32 = GROUP_SIZE * VALUES_PER_THREAD;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(u32)]
@@ -67,26 +67,32 @@ where
     T: abi::Sized,
 {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    uniforms: Uniform<Uniforms>,
+    count: Uniform<u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    data_in: ReadOnlyStorage<[T]>,
+    uniforms: Uniform<Uniforms>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    data_out: Storage<[T]>,
+    data_in: ReadOnlyStorage<[T]>,
     #[resource(binding = 3, visibility = "COMPUTE")]
-    global_base_bucket_offsets: ReadOnlyStorage<[[u32; RADIX_DIGITS]; RADIX_GROUPS]>,
+    data_out: Storage<[T]>,
     #[resource(binding = 4, visibility = "COMPUTE")]
-    group_state: Storage<[[GroupState; RADIX_DIGITS]]>,
+    global_base_bucket_offsets: ReadOnlyStorage<[[u32; RADIX_DIGITS]; RADIX_GROUPS]>,
     #[resource(binding = 5, visibility = "COMPUTE")]
+    group_state: Storage<[[GroupState; RADIX_DIGITS]]>,
+    #[resource(binding = 6, visibility = "COMPUTE")]
     group_counter: Storage<u32>,
 }
 
 type ResourcesLayout<T> = <Resources<T> as empa::resource_binding::Resources>::Layout;
 
-pub struct BucketScatterInput<'a, T, U0, U1, U2> {
+pub struct BucketScatterInput<'a, T, U0, U1, U2, U3> {
     pub data_in: buffer::View<'a, [T], U0>,
     pub data_out: buffer::View<'a, [T], U1>,
     pub global_base_bucket_offsets: buffer::View<'a, [[u32; RADIX_DIGITS]; RADIX_GROUPS], U2>,
     pub radix_group: u32,
+    pub count: Uniform<u32>,
+    pub dispatch_indirect: bool,
+    pub dispatch: buffer::View<'a, DispatchWorkgroups, U3>,
+    pub fallback_count: u32,
 }
 
 pub struct BucketScatter<T>
@@ -130,31 +136,36 @@ where
         }
     }
 
-    pub fn encode<U0, U1, U2>(
+    pub fn encode<U0, U1, U2, U3>(
         &mut self,
         encoder: CommandEncoder,
-        input: BucketScatterInput<T, U0, U1, U2>,
+        input: BucketScatterInput<T, U0, U1, U2, U3>,
     ) -> CommandEncoder
     where
         U0: buffer::StorageBinding,
         U1: buffer::StorageBinding,
         U2: buffer::StorageBinding,
+        U3: buffer::Indirect,
     {
         let BucketScatterInput {
             data_in,
             data_out,
             global_base_bucket_offsets,
             radix_group,
+            count,
+            dispatch_indirect,
+            dispatch,
+            fallback_count,
         } = input;
 
         let radix_offset = RADIX_SIZE * radix_group;
 
-        let workgroups = (data_in.len() as u32).div_ceil(SEGMENT_SIZE);
+        let fallback_groups = fallback_count.div_ceil(BUCKET_SCATTER_SEGMENT_SIZE);
 
-        if self.group_state.len() < workgroups as usize {
+        if self.group_state.len() < fallback_groups as usize {
             self.group_state = self
                 .device
-                .create_slice_buffer_zeroed(workgroups as usize, self.group_state.usage());
+                .create_slice_buffer_zeroed(fallback_groups as usize, self.group_state.usage());
         }
 
         let uniforms = self.device.create_buffer(
@@ -168,6 +179,7 @@ where
         let bind_group = self.device.create_bind_group(
             &self.bind_group_layout,
             Resources {
+                count,
                 uniforms: uniforms.uniform(),
                 data_in: data_in.read_only_storage(),
                 data_out: data_out.storage(),
@@ -177,18 +189,24 @@ where
             },
         );
 
-        encoder
+        let encoder = encoder
             .clear_buffer(self.group_counter.view())
             .clear_buffer_slice(self.group_state.view())
             .begin_compute_pass()
             .set_pipeline(&self.pipeline)
-            .set_bind_groups(&bind_group)
-            .dispatch_workgroups(DispatchWorkgroups {
-                count_x: workgroups,
-                count_y: 1,
-                count_z: 1,
-            })
-            .end()
+            .set_bind_groups(&bind_group);
+
+        if dispatch_indirect {
+            encoder.dispatch_workgroups_indirect(dispatch).end()
+        } else {
+            encoder
+                .dispatch_workgroups(DispatchWorkgroups {
+                    count_x: fallback_groups,
+                    count_y: 1,
+                    count_z: 1,
+                })
+                .end()
+        }
     }
 }
 

@@ -63,6 +63,7 @@ async fn compute() -> Result<(), Box<dyn Error>> {
         RadixSortInput {
             data: data_buffer.view(),
             temporary_storage: temp_storage_buffer.view(),
+            count: None,
         },
     );
     encoder = encoder.write_timestamp(&timestamp_query_set, 1);

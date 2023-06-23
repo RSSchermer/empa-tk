@@ -1,4 +1,4 @@
-use empa::buffer::{ReadOnlyStorage, Storage};
+use empa::buffer::{ReadOnlyStorage, Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
     ComputePipeline, ComputePipelineDescriptorBuilder, ComputeStageBuilder,
@@ -14,25 +14,23 @@ const SHADER_U32: ShaderSource = shader_source!("shader_u32.wgsl");
 
 const GROUP_SIZE: u32 = 256;
 const GROUP_ITERATIONS: u32 = 4;
-const SEGMENT_SIZE: u32 = GROUP_SIZE * GROUP_ITERATIONS;
+pub const BUCKET_HISTOGRAM_SEGMENT_SIZE: u32 = GROUP_SIZE * GROUP_ITERATIONS;
 
 #[derive(empa::resource_binding::Resources)]
-struct Resources<T>
+pub struct BucketHistogramResources<T>
 where
     T: abi::Sized,
 {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    data: ReadOnlyStorage<[T]>,
+    pub count: Uniform<u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    global_histograms: Storage<[[u32; RADIX_DIGITS]; RADIX_GROUPS]>,
+    pub data: ReadOnlyStorage<[T]>,
+    #[resource(binding = 2, visibility = "COMPUTE")]
+    pub global_histograms: Storage<[[u32; RADIX_DIGITS]; RADIX_GROUPS]>,
 }
 
-type ResourcesLayout<T> = <Resources<T> as empa::resource_binding::Resources>::Layout;
-
-pub struct BucketHistogramInput<'a, T, U0, U1> {
-    pub data: buffer::View<'a, [T], U0>,
-    pub global_histograms: buffer::View<'a, [[u32; RADIX_DIGITS]; RADIX_GROUPS], U1>,
-}
+type ResourcesLayout<T> =
+    <BucketHistogramResources<T> as empa::resource_binding::Resources>::Layout;
 
 pub struct BucketHistogram<T>
 where
@@ -67,40 +65,37 @@ where
         }
     }
 
-    pub fn encode<U0, U1>(
+    pub fn encode<U>(
         &mut self,
         encoder: CommandEncoder,
-        input: BucketHistogramInput<T, U0, U1>,
+        resources: BucketHistogramResources<T>,
+        dispatch_indirect: bool,
+        dispatch: buffer::View<DispatchWorkgroups, U>,
+        fallback_count: u32,
     ) -> CommandEncoder
     where
-        U0: buffer::StorageBinding,
-        U1: buffer::StorageBinding,
+        U: buffer::Indirect,
     {
-        let BucketHistogramInput {
-            data,
-            global_histograms,
-        } = input;
+        let bind_group = self
+            .device
+            .create_bind_group(&self.bind_group_layout, resources);
 
-        let workgroups = (data.len() as u32).div_ceil(SEGMENT_SIZE);
-
-        let bind_group = self.device.create_bind_group(
-            &self.bind_group_layout,
-            Resources {
-                data: data.read_only_storage(),
-                global_histograms: global_histograms.storage(),
-            },
-        );
-
-        encoder
+        let encoder = encoder
             .begin_compute_pass()
             .set_pipeline(&self.pipeline)
-            .set_bind_groups(&bind_group)
-            .dispatch_workgroups(DispatchWorkgroups {
-                count_x: workgroups,
-                count_y: 1,
-                count_z: 1,
-            })
-            .end()
+            .set_bind_groups(&bind_group);
+
+        if dispatch_indirect {
+            encoder.dispatch_workgroups_indirect(dispatch).end()
+        } else {
+            encoder
+                .dispatch_workgroups(DispatchWorkgroups {
+                    count_x: fallback_count.div_ceil(BUCKET_HISTOGRAM_SEGMENT_SIZE),
+                    count_y: 1,
+                    count_z: 1,
+                })
+                .end()
+        }
     }
 }
 

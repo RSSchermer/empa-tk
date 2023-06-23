@@ -1,6 +1,7 @@
 mod bucket_histogram;
 mod bucket_scatter;
 mod bucket_scatter_by;
+mod generate_dispatches;
 mod global_bucket_offsets;
 
 mod radix_sort;

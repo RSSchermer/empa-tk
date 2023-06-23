@@ -16,21 +16,24 @@ struct Uniforms {
 }
 
 @group(0) @binding(0)
-var<uniform> uniforms: Uniforms;
+var<uniform> count: u32;
 
 @group(0) @binding(1)
-var<storage, read> data_in: array<u32>;
+var<uniform> uniforms: Uniforms;
 
 @group(0) @binding(2)
-var<storage, read_write> data_out: array<u32>;
+var<storage, read> data_in: array<u32>;
 
 @group(0) @binding(3)
-var<storage, read> global_base_bucket_offsets: array<array<u32, RADIX_DIGITS>, RADIX_GROUPS>;
+var<storage, read_write> data_out: array<u32>;
 
 @group(0) @binding(4)
-var<storage, read_write> group_state: array<array<atomic<u32>, RADIX_DIGITS>>;
+var<storage, read> global_base_bucket_offsets: array<array<u32, RADIX_DIGITS>, RADIX_GROUPS>;
 
 @group(0) @binding(5)
+var<storage, read_write> group_state: array<array<atomic<u32>, RADIX_DIGITS>>;
+
+@group(0) @binding(6)
 var<storage, read_write> group_counter: atomic<u32>;
 
 var<workgroup> segment_index: u32;
@@ -130,11 +133,11 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
     let uniform_segment_index = workgroupUniformLoad(&segment_index);
     let segment_offset = uniform_segment_index * SEGMENT_SIZE;
 
-    if segment_offset >= arrayLength(&data_in) {
+    if segment_offset >= count {
         return;
     }
 
-    let data_size = min(SEGMENT_SIZE, arrayLength(&data_in) - segment_offset);
+    let data_size = min(SEGMENT_SIZE, count - segment_offset);
 
     for (var i = local_index; i < SEGMENT_SIZE; i += GROUP_SIZE) {
         if i < data_size {

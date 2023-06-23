@@ -1,4 +1,5 @@
-use empa::buffer::{ReadOnlyStorage, Storage, Uniform};
+use empa::abi;
+use empa::buffer::{Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
     ComputePipeline, ComputePipelineDescriptorBuilder, ComputeStageBuilder,
@@ -9,25 +10,34 @@ use empa::shader_module::{shader_source, ShaderSource};
 
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
-#[derive(empa::resource_binding::Resources)]
-pub struct ResolveRunCountResources {
-    #[resource(binding = 0, visibility = "COMPUTE")]
-    pub count: Uniform<u32>,
-    #[resource(binding = 1, visibility = "COMPUTE")]
-    pub temporary_storage: ReadOnlyStorage<[u32]>,
-    #[resource(binding = 2, visibility = "COMPUTE")]
-    pub run_count: Storage<u32>,
+#[derive(abi::Sized, Clone, Copy)]
+#[repr(C)]
+pub struct SegmentSizes {
+    pub histogram: u32,
+    pub scatter: u32,
 }
 
-type ResourcesLayout = <ResolveRunCountResources as empa::resource_binding::Resources>::Layout;
+#[derive(empa::resource_binding::Resources)]
+pub struct GenerateDispatchesResources {
+    #[resource(binding = 0, visibility = "COMPUTE")]
+    pub segment_sizes: Uniform<SegmentSizes>,
+    #[resource(binding = 1, visibility = "COMPUTE")]
+    pub count: Uniform<u32>,
+    #[resource(binding = 2, visibility = "COMPUTE")]
+    pub histogram_dispatch: Storage<DispatchWorkgroups>,
+    #[resource(binding = 3, visibility = "COMPUTE")]
+    pub scatter_dispatch: Storage<DispatchWorkgroups>,
+}
 
-pub struct ResolveRunCount {
+type ResourcesLayout = <GenerateDispatchesResources as empa::resource_binding::Resources>::Layout;
+
+pub struct GenerateDispatches {
     device: Device,
     bind_group_layout: BindGroupLayout<ResourcesLayout>,
     pipeline: ComputePipeline<(ResourcesLayout,)>,
 }
 
-impl ResolveRunCount {
+impl GenerateDispatches {
     pub fn init(device: Device) -> Self {
         let shader = device.create_shader_module(&SHADER);
 
@@ -41,7 +51,7 @@ impl ResolveRunCount {
                 .finish(),
         );
 
-        ResolveRunCount {
+        GenerateDispatches {
             device,
             bind_group_layout,
             pipeline,
@@ -51,7 +61,7 @@ impl ResolveRunCount {
     pub fn encode(
         &self,
         encoder: CommandEncoder,
-        resources: ResolveRunCountResources,
+        resources: GenerateDispatchesResources,
     ) -> CommandEncoder {
         let bind_group = self
             .device

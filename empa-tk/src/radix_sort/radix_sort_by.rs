@@ -51,6 +51,21 @@ where
         mut encoder: CommandEncoder,
         input: RadixSortByInput<K, V, U0, U1, U2, U3>,
     ) -> CommandEncoder
+        where
+            U0: buffer::StorageBinding,
+            U1: buffer::StorageBinding,
+            U2: buffer::StorageBinding,
+            U3: buffer::StorageBinding,
+    {
+        self.encode_internal(encoder, input, 4)
+    }
+
+    fn encode_internal<U0, U1, U2, U3>(
+        &mut self,
+        mut encoder: CommandEncoder,
+        input: RadixSortByInput<K, V, U0, U1, U2, U3>,
+        radix_groups: usize,
+    ) -> CommandEncoder
     where
         U0: buffer::StorageBinding,
         U1: buffer::StorageBinding,
@@ -109,7 +124,7 @@ where
         let values_a = values;
         let values_b = temporary_value_storage;
 
-        for i in 0..RADIX_GROUPS {
+        for i in 0..radix_groups {
             if (i & 1) == 0 {
                 encoder = self.bucket_scatter_by.encode(
                     encoder,
@@ -196,5 +211,19 @@ where
             histogram_dispatch,
             scatter_dispatch,
         }
+    }
+
+    pub fn encode_half_precision<U0, U1, U2, U3>(
+        &mut self,
+        mut encoder: CommandEncoder,
+        input: RadixSortByInput<u32, V, U0, U1, U2, U3>,
+    ) -> CommandEncoder
+        where
+            U0: buffer::StorageBinding,
+            U1: buffer::StorageBinding,
+            U2: buffer::StorageBinding,
+            U3: buffer::StorageBinding,
+    {
+        self.encode_internal(encoder, input, 2)
     }
 }

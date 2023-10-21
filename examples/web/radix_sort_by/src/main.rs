@@ -2,6 +2,7 @@ use std::error::Error;
 
 use arwa::console;
 use arwa::window::window;
+use bytemuck::Zeroable;
 use empa::adapter::Features;
 use empa::arwa::{NavigatorExt, RequestAdapterOptions};
 use empa::buffer::Buffer;
@@ -9,7 +10,6 @@ use empa::device::DeviceDescriptor;
 use empa::{abi, buffer};
 use empa_tk::radix_sort::{RadixSortBy, RadixSortByInput};
 use futures::FutureExt;
-use zeroable::Zeroable;
 
 #[derive(abi::Sized, Clone, Copy, PartialEq, Default, Debug, Zeroable)]
 #[repr(C)]

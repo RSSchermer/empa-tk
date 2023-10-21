@@ -1,6 +1,7 @@
 use std::fmt;
 use std::fmt::Write;
 
+use bytemuck::Zeroable;
 use empa::buffer::{Buffer, ReadOnlyStorage, Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
@@ -11,7 +12,6 @@ use empa::resource_binding::BindGroupLayout;
 use empa::shader_module::ShaderSource;
 use empa::type_flag::{O, X};
 use empa::{abi, buffer};
-use zeroable::Zeroable;
 
 use crate::radix_sort::{RADIX_DIGITS, RADIX_GROUPS, RADIX_SIZE};
 use crate::write_value_type::write_value_type;

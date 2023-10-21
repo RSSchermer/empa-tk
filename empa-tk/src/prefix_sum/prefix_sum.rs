@@ -1,3 +1,4 @@
+use bytemuck::Zeroable;
 use empa::buffer::{Buffer, Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
@@ -8,7 +9,6 @@ use empa::resource_binding::BindGroupLayout;
 use empa::shader_module::{shader_source, ShaderSource};
 use empa::type_flag::{O, X};
 use empa::{abi, buffer};
-use zeroable::Zeroable;
 
 use crate::generate_dispatch::{GenerateDispatch, GenerateDispatchResources};
 

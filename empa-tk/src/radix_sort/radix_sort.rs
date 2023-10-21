@@ -47,9 +47,9 @@ where
         mut encoder: CommandEncoder,
         input: RadixSortInput<T, U0, U1>,
     ) -> CommandEncoder
-        where
-            U0: buffer::StorageBinding,
-            U1: buffer::StorageBinding,
+    where
+        U0: buffer::StorageBinding,
+        U1: buffer::StorageBinding,
     {
         self.encode_internal(encoder, input, 4)
     }
@@ -198,9 +198,9 @@ impl RadixSort<u32> {
         mut encoder: CommandEncoder,
         input: RadixSortInput<u32, U0, U1>,
     ) -> CommandEncoder
-        where
-            U0: buffer::StorageBinding,
-            U1: buffer::StorageBinding,
+    where
+        U0: buffer::StorageBinding,
+        U1: buffer::StorageBinding,
     {
         self.encode_internal(encoder, input, 2)
     }

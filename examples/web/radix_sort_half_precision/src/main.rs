@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::ops::Rem;
 
 use arwa::console;
 use arwa::window::window;
@@ -9,7 +10,6 @@ use empa::buffer::Buffer;
 use empa::device::DeviceDescriptor;
 use empa_tk::radix_sort::{RadixSort, RadixSortInput};
 use futures::FutureExt;
-use std::ops::Rem;
 
 fn main() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));

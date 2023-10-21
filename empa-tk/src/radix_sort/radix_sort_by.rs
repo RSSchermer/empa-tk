@@ -51,11 +51,11 @@ where
         mut encoder: CommandEncoder,
         input: RadixSortByInput<K, V, U0, U1, U2, U3>,
     ) -> CommandEncoder
-        where
-            U0: buffer::StorageBinding,
-            U1: buffer::StorageBinding,
-            U2: buffer::StorageBinding,
-            U3: buffer::StorageBinding,
+    where
+        U0: buffer::StorageBinding,
+        U1: buffer::StorageBinding,
+        U2: buffer::StorageBinding,
+        U3: buffer::StorageBinding,
     {
         self.encode_internal(encoder, input, 4)
     }
@@ -218,11 +218,11 @@ where
         mut encoder: CommandEncoder,
         input: RadixSortByInput<u32, V, U0, U1, U2, U3>,
     ) -> CommandEncoder
-        where
-            U0: buffer::StorageBinding,
-            U1: buffer::StorageBinding,
-            U2: buffer::StorageBinding,
-            U3: buffer::StorageBinding,
+    where
+        U0: buffer::StorageBinding,
+        U1: buffer::StorageBinding,
+        U2: buffer::StorageBinding,
+        U3: buffer::StorageBinding,
     {
         self.encode_internal(encoder, input, 2)
     }

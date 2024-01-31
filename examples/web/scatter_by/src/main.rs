@@ -41,7 +41,7 @@ async fn compute() -> Result<(), Box<dyn Error>> {
         by.push(count as u32 - 1 - i);
     }
 
-    let mut scatter_by = ScatterBy::init_u32(device.clone());
+    let mut scatter_by = ScatterBy::init_u32(device.clone()).await;
 
     let data_buffer: Buffer<[u32], _> =
         device.create_buffer(data, buffer::Usages::storage_binding());

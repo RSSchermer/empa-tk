@@ -1,4 +1,4 @@
-#![feature(int_roundings)]
+#![feature(future_join, int_roundings)]
 
 pub mod find_runs;
 pub mod gather_by;

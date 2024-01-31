@@ -36,7 +36,7 @@ async fn compute() -> Result<(), Box<dyn Error>> {
         count
     );
 
-    let mut evaluator = PrefixSum::init_exclusive_u32(device.clone());
+    let mut evaluator = PrefixSum::init_exclusive_u32(device.clone()).await;
 
     let data: Vec<u32> = vec![1; count];
 

@@ -27,18 +27,20 @@ pub struct GlobalBucketOffsets {
 }
 
 impl GlobalBucketOffsets {
-    pub fn init(device: Device) -> Self {
+    pub async fn init(device: Device) -> Self {
         let shader = device.create_shader_module(&SHADER);
 
         let bind_group_layout = device.create_bind_group_layout::<ResourcesLayout>();
         let pipeline_layout = device.create_pipeline_layout(&bind_group_layout);
 
-        let pipeline = device.create_compute_pipeline(
-            &ComputePipelineDescriptorBuilder::begin()
-                .layout(&pipeline_layout)
-                .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
-                .finish(),
-        );
+        let pipeline = device
+            .create_compute_pipeline(
+                &ComputePipelineDescriptorBuilder::begin()
+                    .layout(&pipeline_layout)
+                    .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
+                    .finish(),
+            )
+            .await;
 
         GlobalBucketOffsets {
             device,

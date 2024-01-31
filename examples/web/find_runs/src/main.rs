@@ -42,7 +42,7 @@ async fn compute() -> Result<(), Box<dyn Error>> {
 
     console::log!("Finding the offset of 'runs' of the same number within a list of numbers.");
 
-    let mut find_runs = FindRuns::init_u32(device.clone());
+    let mut find_runs = FindRuns::init_u32(device.clone()).await;
 
     let data_buffer: Buffer<[u32], _> =
         device.create_buffer(data, buffer::Usages::storage_binding().and_copy_src());

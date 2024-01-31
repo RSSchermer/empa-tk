@@ -1,4 +1,5 @@
 use std::fmt::Write;
+use std::future::join;
 
 use empa::buffer::{Buffer, ReadOnlyStorage, Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
@@ -60,7 +61,7 @@ where
     B: abi::Sized,
     V: abi::Sized,
 {
-    fn init_internal(device: Device, by_type: &str, shader_template: &str) -> Self {
+    async fn init_internal(device: Device, by_type: &str, shader_template: &str) -> Self {
         let mut code = String::new();
 
         write_value_type::<V>(&mut code);
@@ -73,7 +74,7 @@ where
         let bind_group_layout = device.create_bind_group_layout::<ResourcesLayout<B, V>>();
         let pipeline_layout = device.create_pipeline_layout(&bind_group_layout);
 
-        let pipeline = unsafe {
+        let create_pipeline = unsafe {
             device.create_compute_pipeline(
                 &ComputePipelineDescriptorBuilder::begin()
                     .layout(&pipeline_layout)
@@ -81,7 +82,10 @@ where
                     .finish(),
             )
         };
-        let generate_dispatch = GenerateDispatch::init(device.clone());
+        let init_generate_dispatch = GenerateDispatch::init(device.clone());
+
+        let (pipeline, generate_dispatch) = join!(create_pipeline, init_generate_dispatch,).await;
+
         let group_size = device.create_buffer(GROUP_SIZE, buffer::Usages::uniform_binding());
         let dispatch = device.create_buffer(
             DispatchWorkgroups {
@@ -175,8 +179,8 @@ impl<V> ScatterBy<u32, V>
 where
     V: abi::Sized,
 {
-    pub fn init_u32(device: Device) -> Self {
-        Self::init_internal(device, "u32", SHADER_TEMPLATE)
+    pub async fn init_u32(device: Device) -> Self {
+        Self::init_internal(device, "u32", SHADER_TEMPLATE).await
     }
 }
 
@@ -184,7 +188,7 @@ impl<V> ScatterBy<i32, V>
 where
     V: abi::Sized,
 {
-    pub fn init_i32(device: Device) -> Self {
-        Self::init_internal(device, "i32", SHADER_TEMPLATE)
+    pub async fn init_i32(device: Device) -> Self {
+        Self::init_internal(device, "i32", SHADER_TEMPLATE).await
     }
 }

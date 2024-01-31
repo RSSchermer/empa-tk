@@ -45,18 +45,20 @@ impl<T> BucketHistogram<T>
 where
     T: abi::Sized,
 {
-    fn init_internal(device: Device, shader_source: &ShaderSource) -> Self {
+    async fn init_internal(device: Device, shader_source: &ShaderSource) -> Self {
         let shader = device.create_shader_module(shader_source);
 
         let bind_group_layout = device.create_bind_group_layout::<ResourcesLayout<T>>();
         let pipeline_layout = device.create_pipeline_layout(&bind_group_layout);
 
-        let pipeline = device.create_compute_pipeline(
-            &ComputePipelineDescriptorBuilder::begin()
-                .layout(&pipeline_layout)
-                .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
-                .finish(),
-        );
+        let pipeline = device
+            .create_compute_pipeline(
+                &ComputePipelineDescriptorBuilder::begin()
+                    .layout(&pipeline_layout)
+                    .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
+                    .finish(),
+            )
+            .await;
 
         BucketHistogram {
             device,
@@ -100,7 +102,7 @@ where
 }
 
 impl BucketHistogram<u32> {
-    pub fn init_u32(device: Device) -> Self {
-        Self::init_internal(device, &SHADER_U32)
+    pub async fn init_u32(device: Device) -> Self {
+        Self::init_internal(device, &SHADER_U32).await
     }
 }

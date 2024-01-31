@@ -31,7 +31,7 @@ async fn compute() -> Result<(), Box<dyn Error>> {
         })
         .await?;
 
-    let mut radix_sort = RadixSort::init_u32(device.clone());
+    let mut radix_sort = RadixSort::init_u32(device.clone()).await;
 
     let count = 1_000_000;
 

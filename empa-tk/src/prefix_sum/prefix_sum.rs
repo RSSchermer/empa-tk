@@ -1,3 +1,5 @@
+use std::future::join;
+
 use bytemuck::Zeroable;
 use empa::buffer::{Buffer, Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
@@ -72,13 +74,13 @@ impl<T> PrefixSum<T>
 where
     T: abi::Sized,
 {
-    fn init_internal(device: Device, shader_source: &ShaderSource) -> Self {
+    async fn init_internal(device: Device, shader_source: &ShaderSource) -> Self {
         let shader = device.create_shader_module(shader_source);
 
         let bind_group_layout = device.create_bind_group_layout::<ResourcesLayout<T>>();
         let pipeline_layout = device.create_pipeline_layout(&bind_group_layout);
 
-        let pipeline = device.create_compute_pipeline(
+        let create_pipeline = device.create_compute_pipeline(
             &ComputePipelineDescriptorBuilder::begin()
                 .layout(&pipeline_layout)
                 .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
@@ -89,7 +91,7 @@ where
         let group_counter =
             device.create_buffer(0, buffer::Usages::storage_binding().and_copy_dst());
 
-        let generate_dispatch = GenerateDispatch::init(device.clone());
+        let init_generate_dispatch = GenerateDispatch::init(device.clone());
         let group_size = device.create_buffer(SEGMENT_SIZE, buffer::Usages::uniform_binding());
         let dispatch = device.create_buffer(
             DispatchWorkgroups {
@@ -99,6 +101,8 @@ where
             },
             buffer::Usages::storage_binding().and_indirect(),
         );
+
+        let (pipeline, generate_dispatch) = join!(create_pipeline, init_generate_dispatch).await;
 
         PrefixSum {
             device,
@@ -183,28 +187,28 @@ where
 }
 
 impl PrefixSum<u32> {
-    pub fn init_exclusive_u32(device: Device) -> Self {
-        Self::init_internal(device, &EXCLUSIVE_SHADER_U32)
+    pub async fn init_exclusive_u32(device: Device) -> Self {
+        Self::init_internal(device, &EXCLUSIVE_SHADER_U32).await
     }
-    pub fn init_inclusive_u32(device: Device) -> Self {
-        Self::init_internal(device, &INCLUSIVE_SHADER_U32)
+    pub async fn init_inclusive_u32(device: Device) -> Self {
+        Self::init_internal(device, &INCLUSIVE_SHADER_U32).await
     }
 }
 
 impl PrefixSum<i32> {
-    pub fn init_exclusive_i32(device: Device) -> Self {
-        Self::init_internal(device, &EXCLUSIVE_SHADER_I32)
+    pub async fn init_exclusive_i32(device: Device) -> Self {
+        Self::init_internal(device, &EXCLUSIVE_SHADER_I32).await
     }
-    pub fn init_inclusive_i32(device: Device) -> Self {
-        Self::init_internal(device, &INCLUSIVE_SHADER_I32)
+    pub async fn init_inclusive_i32(device: Device) -> Self {
+        Self::init_internal(device, &INCLUSIVE_SHADER_I32).await
     }
 }
 
 impl PrefixSum<f32> {
-    pub fn init_exclusive_f32(device: Device) -> Self {
-        Self::init_internal(device, &EXCLUSIVE_SHADER_F32)
+    pub async fn init_exclusive_f32(device: Device) -> Self {
+        Self::init_internal(device, &EXCLUSIVE_SHADER_F32).await
     }
-    pub fn init_inclusive_f32(device: Device) -> Self {
-        Self::init_internal(device, &INCLUSIVE_SHADER_F32)
+    pub async fn init_inclusive_f32(device: Device) -> Self {
+        Self::init_internal(device, &INCLUSIVE_SHADER_F32).await
     }
 }

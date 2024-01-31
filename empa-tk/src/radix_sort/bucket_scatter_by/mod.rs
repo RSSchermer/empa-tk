@@ -121,7 +121,7 @@ where
     K: abi::Sized,
     V: abi::Sized,
 {
-    fn init_internal(device: Device, shader_template: &str) -> Self {
+    async fn init_internal(device: Device, shader_template: &str) -> Self {
         let mut code = String::new();
 
         write_value_type::<V>(&mut code);
@@ -141,7 +141,8 @@ where
                     .compute_unchecked(&ComputeStageBuilder::begin(&shader, "main").finish())
                     .finish(),
             )
-        };
+        }
+        .await;
 
         let group_state =
             device.create_slice_buffer_zeroed(1, buffer::Usages::storage_binding().and_copy_dst());
@@ -241,7 +242,7 @@ impl<V> BucketScatterBy<u32, V>
 where
     V: abi::Sized,
 {
-    pub fn init_u32(device: Device) -> Self {
-        Self::init_internal(device, SHADER_TEMPLATE_U32)
+    pub async fn init_u32(device: Device) -> Self {
+        Self::init_internal(device, SHADER_TEMPLATE_U32).await
     }
 }

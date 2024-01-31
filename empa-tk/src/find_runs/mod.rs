@@ -1,3 +1,5 @@
+use std::future::{join, Future};
+
 use empa::buffer::{Buffer, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups};
 use empa::device::Device;
@@ -45,11 +47,25 @@ impl<T> FindRuns<T>
 where
     T: abi::Sized,
 {
-    fn init_internal(device: Device, mark_run_starts: MarkRunStarts<T>) -> Self {
-        let prefix_sum_inclusive = PrefixSum::init_inclusive_u32(device.clone());
-        let collect_run_starts = CollectRunStarts::init(device.clone());
-        let resolve_run_count = ResolveRunCount::init(device.clone());
-        let generate_dispatch = GenerateDispatch::init(device.clone());
+    async fn init_internal(
+        device: Device,
+        init_mark_run_starts: impl Future<Output = MarkRunStarts<T>>,
+    ) -> Self {
+        let (
+            mark_run_starts,
+            prefix_sum_inclusive,
+            collect_run_starts,
+            resolve_run_count,
+            generate_dispatch,
+        ) = join!(
+            init_mark_run_starts,
+            PrefixSum::init_inclusive_u32(device.clone()),
+            CollectRunStarts::init(device.clone()),
+            ResolveRunCount::init(device.clone()),
+            GenerateDispatch::init(device.clone()),
+        )
+        .await;
+
         let group_size = device.create_buffer(GROUPS_SIZE, buffer::Usages::uniform_binding());
         let dispatch = device.create_buffer(
             DispatchWorkgroups {
@@ -159,25 +175,25 @@ where
 }
 
 impl FindRuns<u32> {
-    pub fn init_u32(device: Device) -> Self {
-        let mark_run_starts = MarkRunStarts::init_u32(device.clone());
+    pub async fn init_u32(device: Device) -> Self {
+        let init_mark_run_starts = MarkRunStarts::init_u32(device.clone());
 
-        FindRuns::init_internal(device, mark_run_starts)
+        FindRuns::init_internal(device, init_mark_run_starts).await
     }
 }
 
 impl FindRuns<i32> {
-    pub fn init_i32(device: Device) -> Self {
-        let mark_run_starts = MarkRunStarts::init_i32(device.clone());
+    pub async fn init_i32(device: Device) -> Self {
+        let init_mark_run_starts = MarkRunStarts::init_i32(device.clone());
 
-        FindRuns::init_internal(device, mark_run_starts)
+        FindRuns::init_internal(device, init_mark_run_starts).await
     }
 }
 
 impl FindRuns<f32> {
-    pub fn init_f32(device: Device) -> Self {
-        let mark_run_starts = MarkRunStarts::init_f32(device.clone());
+    pub async fn init_f32(device: Device) -> Self {
+        let init_mark_run_starts = MarkRunStarts::init_f32(device.clone());
 
-        FindRuns::init_internal(device, mark_run_starts)
+        FindRuns::init_internal(device, init_mark_run_starts).await
     }
 }

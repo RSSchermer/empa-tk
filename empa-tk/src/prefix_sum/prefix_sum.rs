@@ -29,9 +29,8 @@ const INCLUSIVE_SHADER_F32: ShaderSource = shader_source!("inclusive_shader_f32.
 #[derive(abi::Sized, Clone, Copy, Debug, Zeroable)]
 #[repr(C)]
 pub struct GroupState {
-    aggregate: u32,
-    inclusive_prefix: u32,
-    status: u32,
+    state_0: u32,
+    state_1: u32,
 }
 
 #[derive(empa::resource_binding::Resources)]

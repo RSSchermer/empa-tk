@@ -7,7 +7,7 @@ const SEGMENT_SIZE = 1024;//GROUP_SIZE * GROUP_ITERATIONS;
 const RADIX_GROUPS = 4u;//32 / RADIX_SIZE;
 
 @group(0) @binding(0)
-var<uniform> count: u32;
+var<uniform> max_count: u32;
 
 @group(0) @binding(1)
 var<storage, read> data: array<u32>;
@@ -20,6 +20,7 @@ var<workgroup> local_histograms: array<array<atomic<u32>, RADIX_DIGITS>, RADIX_G
 @compute @workgroup_size(256, 1, 1)
 fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>, @builtin(local_invocation_index) local_index: u32) {
     let group_index = workgroup_id.x;
+    let count = max(max_count, arrayLength(&data));
 
     let segment_offset = group_index * SEGMENT_SIZE;
 

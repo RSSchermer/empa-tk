@@ -22,7 +22,7 @@ where
     T: abi::Sized,
 {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    pub count: Uniform<u32>,
+    pub max_count: Uniform<u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
     pub data: ReadOnlyStorage<[T]>,
     #[resource(binding = 2, visibility = "COMPUTE")]

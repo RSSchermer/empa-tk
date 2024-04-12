@@ -67,7 +67,7 @@ where
     T: abi::Sized,
 {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    count: Uniform<u32>,
+    max_count: Uniform<u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
     uniforms: Uniform<Uniforms>,
     #[resource(binding = 2, visibility = "COMPUTE")]
@@ -89,7 +89,7 @@ pub struct BucketScatterInput<'a, T, U0, U1, U2, U3> {
     pub data_out: buffer::View<'a, [T], U1>,
     pub global_base_bucket_offsets: buffer::View<'a, [[u32; RADIX_DIGITS]; RADIX_GROUPS], U2>,
     pub radix_group: u32,
-    pub count: Uniform<u32>,
+    pub max_count: Uniform<u32>,
     pub dispatch_indirect: bool,
     pub dispatch: buffer::View<'a, DispatchWorkgroups, U3>,
     pub fallback_count: u32,
@@ -154,7 +154,7 @@ where
             data_out,
             global_base_bucket_offsets,
             radix_group,
-            count,
+            max_count,
             dispatch_indirect,
             dispatch,
             fallback_count,
@@ -181,7 +181,7 @@ where
         let bind_group = self.device.create_bind_group(
             &self.bind_group_layout,
             Resources {
-                count,
+                max_count,
                 uniforms: uniforms.uniform(),
                 data_in: data_in.read_only_storage(),
                 data_out: data_out.storage(),

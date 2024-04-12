@@ -1,5 +1,5 @@
 use empa::abi;
-use empa::buffer::{Storage, Uniform};
+use empa::buffer::{Storage, Uniform, ReadOnlyStorage};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
     ComputePipeline, ComputePipelineDescriptorBuilder, ComputeStageBuilder,
@@ -18,30 +18,32 @@ pub struct SegmentSizes {
 }
 
 #[derive(empa::resource_binding::Resources)]
-pub struct GenerateDispatchesResources {
+pub struct GenerateDispatchesResources<T> where T: abi::Sized {
     #[resource(binding = 0, visibility = "COMPUTE")]
     pub segment_sizes: Uniform<SegmentSizes>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    pub count: Uniform<u32>,
+    pub max_count: Uniform<u32>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    pub histogram_dispatch: Storage<DispatchWorkgroups>,
+    pub data: ReadOnlyStorage<[T]>,
     #[resource(binding = 3, visibility = "COMPUTE")]
+    pub histogram_dispatch: Storage<DispatchWorkgroups>,
+    #[resource(binding = 4, visibility = "COMPUTE")]
     pub scatter_dispatch: Storage<DispatchWorkgroups>,
 }
 
-type ResourcesLayout = <GenerateDispatchesResources as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout<T> = <GenerateDispatchesResources<T> as empa::resource_binding::Resources>::Layout;
 
-pub struct GenerateDispatches {
+pub struct GenerateDispatches<T> where T: abi::Sized {
     device: Device,
-    bind_group_layout: BindGroupLayout<ResourcesLayout>,
-    pipeline: ComputePipeline<(ResourcesLayout,)>,
+    bind_group_layout: BindGroupLayout<ResourcesLayout<T>>,
+    pipeline: ComputePipeline<(ResourcesLayout<T>,)>,
 }
 
-impl GenerateDispatches {
+impl<T> GenerateDispatches<T> where T: abi::Sized {
     pub async fn init(device: Device) -> Self {
         let shader = device.create_shader_module(&SHADER);
 
-        let bind_group_layout = device.create_bind_group_layout::<ResourcesLayout>();
+        let bind_group_layout = device.create_bind_group_layout::<ResourcesLayout<T>>();
         let pipeline_layout = device.create_pipeline_layout(&bind_group_layout);
 
         let pipeline = device
@@ -63,7 +65,7 @@ impl GenerateDispatches {
     pub fn encode(
         &self,
         encoder: CommandEncoder,
-        resources: GenerateDispatchesResources,
+        resources: GenerateDispatchesResources<T>,
     ) -> CommandEncoder {
         let bind_group = self
             .device

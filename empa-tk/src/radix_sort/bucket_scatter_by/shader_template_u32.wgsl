@@ -16,7 +16,7 @@ struct Uniforms {
 }
 
 @group(0) @binding(0)
-var<uniform> count: u32;
+var<uniform> max_count: u32;
 
 @group(0) @binding(1)
 var<uniform> uniforms: Uniforms;
@@ -143,6 +143,8 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
 
     let uniform_segment_index = workgroupUniformLoad(&segment_index);
     let segment_offset = uniform_segment_index * SEGMENT_SIZE;
+
+    let count = max(max_count, arrayLength(&keys_in));
 
     if segment_offset >= count {
         return;

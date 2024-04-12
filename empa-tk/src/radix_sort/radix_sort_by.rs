@@ -32,7 +32,7 @@ where
     V: abi::Sized,
 {
     device: Device,
-    generate_dispatches: GenerateDispatches,
+    generate_dispatches: GenerateDispatches<K>,
     bucket_histogram: BucketHistogram<K>,
     global_bucket_offsets: GlobalBucketOffsets,
     bucket_scatter_by: BucketScatterBy<K, V>,
@@ -97,7 +97,8 @@ where
                 encoder,
                 GenerateDispatchesResources {
                     segment_sizes: self.segment_sizes.uniform(),
-                    count: count.clone(),
+                    max_count: count.clone(),
+                    data: keys.read_only_storage(),
                     histogram_dispatch: self.histogram_dispatch.storage(),
                     scatter_dispatch: self.scatter_dispatch.storage(),
                 },
@@ -108,7 +109,7 @@ where
         encoder = self.bucket_histogram.encode(
             encoder,
             BucketHistogramResources {
-                count: count.clone(),
+                max_count: count.clone(),
                 data: keys.read_only_storage(),
                 global_histograms: self.global_bucket_data.storage(),
             },
@@ -137,7 +138,7 @@ where
                         values_out: values_b,
                         global_base_bucket_offsets: self.global_bucket_data.view(),
                         radix_group: i as u32,
-                        count: count.clone(),
+                        max_count: count.clone(),
                         dispatch_indirect,
                         dispatch: self.scatter_dispatch.view(),
                         fallback_count,
@@ -153,7 +154,7 @@ where
                         values_out: values_a,
                         global_base_bucket_offsets: self.global_bucket_data.view(),
                         radix_group: i as u32,
-                        count: count.clone(),
+                        max_count: count.clone(),
                         dispatch_indirect,
                         dispatch: self.scatter_dispatch.view(),
                         fallback_count,

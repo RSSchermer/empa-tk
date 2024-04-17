@@ -30,7 +30,7 @@ fn div_ceil(a: u32, b: u32) -> u32 {
 
 @compute @workgroup_size(1, 1, 1)
 fn main() {
-    let count = max(max_count, arrayLength(&data));
+    let count = min(max_count, arrayLength(&data));
 
     let histogram_workgroups = div_ceil(count, segment_sizes.histogram);
 

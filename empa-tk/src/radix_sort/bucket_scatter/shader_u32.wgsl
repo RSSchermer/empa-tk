@@ -133,7 +133,7 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
     let uniform_segment_index = workgroupUniformLoad(&segment_index);
     let segment_offset = uniform_segment_index * SEGMENT_SIZE;
 
-    let count = max(max_count, arrayLength(&data_in));
+    let count = min(max_count, arrayLength(&data_in));
 
     if segment_offset >= count {
         return;

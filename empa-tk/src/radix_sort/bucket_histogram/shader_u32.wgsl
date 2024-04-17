@@ -20,7 +20,7 @@ var<workgroup> local_histograms: array<array<atomic<u32>, RADIX_DIGITS>, RADIX_G
 @compute @workgroup_size(256, 1, 1)
 fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>, @builtin(local_invocation_index) local_index: u32) {
     let group_index = workgroup_id.x;
-    let count = max(max_count, arrayLength(&data));
+    let count = min(max_count, arrayLength(&data));
 
     let segment_offset = group_index * SEGMENT_SIZE;
 

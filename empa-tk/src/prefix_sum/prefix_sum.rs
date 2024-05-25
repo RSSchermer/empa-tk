@@ -1,6 +1,7 @@
 use std::future::join;
 
 use bytemuck::Zeroable;
+use empa::access_mode::ReadWrite;
 use empa::buffer::{Buffer, Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
@@ -12,6 +13,7 @@ use empa::shader_module::{shader_source, ShaderSource};
 use empa::type_flag::{O, X};
 use empa::{abi, buffer};
 
+use crate::count_buffer::CountBuffer;
 use crate::generate_dispatch::{GenerateDispatch, GenerateDispatchResources};
 
 const GROUPS_SIZE: u32 = 256;
@@ -34,25 +36,25 @@ pub struct GroupState {
 }
 
 #[derive(empa::resource_binding::Resources)]
-struct Resources<T>
+struct Resources<'a, T>
 where
     T: abi::Sized,
 {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    count: Uniform<u32>,
+    count: Uniform<'a, u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    data: Storage<[T]>,
+    data: Storage<'a, [T], ReadWrite>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    group_state: Storage<[GroupState]>,
+    group_state: Storage<'a, [GroupState], ReadWrite>,
     #[resource(binding = 3, visibility = "COMPUTE")]
-    group_counter: Storage<u32>,
+    group_counter: Storage<'a, u32, ReadWrite>,
 }
 
-type ResourcesLayout<T> = <Resources<T> as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout<T> = <Resources<'static, T> as empa::resource_binding::Resources>::Layout;
 
 pub struct PrefixSumInput<'a, T, U> {
     pub data: buffer::View<'a, [T], U>,
-    pub count: Option<Uniform<u32>>,
+    pub count: Option<Uniform<'a, u32>>,
 }
 
 pub struct PrefixSum<T>
@@ -82,7 +84,7 @@ where
         let create_pipeline = device.create_compute_pipeline(
             &ComputePipelineDescriptorBuilder::begin()
                 .layout(&pipeline_layout)
-                .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
+                .compute(ComputeStageBuilder::begin(&shader, "main").finish())
                 .finish(),
         );
         let group_state =
@@ -126,13 +128,7 @@ where
         let PrefixSumInput { data, count } = input;
 
         let dispatch_indirect = count.is_some();
-
-        let count = count.unwrap_or_else(|| {
-            self.device
-                .create_buffer(data.len() as u32, buffer::Usages::uniform_binding())
-                .uniform()
-        });
-
+        let count = CountBuffer::new(count, &self.device, data.len() as u32);
         let workgroups = (data.len() as u32).div_ceil(SEGMENT_SIZE);
 
         if self.group_state.len() < workgroups as usize {
@@ -144,7 +140,7 @@ where
         let bind_group = self.device.create_bind_group(
             &self.bind_group_layout,
             Resources {
-                count: count.clone(),
+                count: count.uniform(),
                 data: data.storage(),
                 group_state: self.group_state.storage(),
                 group_counter: self.group_counter.storage(),
@@ -156,7 +152,7 @@ where
                 encoder,
                 GenerateDispatchResources {
                     group_size: self.group_size.uniform(),
-                    count,
+                    count: count.uniform(),
                     dispatch: self.dispatch.storage(),
                 },
             );

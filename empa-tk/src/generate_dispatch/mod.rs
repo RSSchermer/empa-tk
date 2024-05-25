@@ -1,3 +1,4 @@
+use empa::access_mode::ReadWrite;
 use empa::buffer::{Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
@@ -10,16 +11,17 @@ use empa::shader_module::{shader_source, ShaderSource};
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-pub struct GenerateDispatchResources {
+pub struct GenerateDispatchResources<'a> {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    pub group_size: Uniform<u32>,
+    pub group_size: Uniform<'a, u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    pub count: Uniform<u32>,
+    pub count: Uniform<'a, u32>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    pub dispatch: Storage<DispatchWorkgroups>,
+    pub dispatch: Storage<'a, DispatchWorkgroups, ReadWrite>,
 }
 
-type ResourcesLayout = <GenerateDispatchResources as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout =
+    <GenerateDispatchResources<'static> as empa::resource_binding::Resources>::Layout;
 
 pub struct GenerateDispatch {
     device: Device,
@@ -38,7 +40,7 @@ impl GenerateDispatch {
             .create_compute_pipeline(
                 &ComputePipelineDescriptorBuilder::begin()
                     .layout(&pipeline_layout)
-                    .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
+                    .compute(ComputeStageBuilder::begin(&shader, "main").finish())
                     .finish(),
             )
             .await;

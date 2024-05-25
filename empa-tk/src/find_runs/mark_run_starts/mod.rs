@@ -1,10 +1,11 @@
-use empa::buffer::{ReadOnlyStorage, Storage, Uniform};
+use empa::access_mode::ReadWrite;
+use empa::buffer::{Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
     ComputePipeline, ComputePipelineDescriptorBuilder, ComputeStageBuilder,
 };
 use empa::device::Device;
-use empa::resource_binding::BindGroupLayout;
+use empa::resource_binding::{BindGroupLayout, Resources};
 use empa::shader_module::{shader_source, ShaderSource};
 use empa::{abi, buffer};
 
@@ -15,19 +16,19 @@ const SHADER_I32: ShaderSource = shader_source!("shader_i32.wgsl");
 const SHADER_F32: ShaderSource = shader_source!("shader_f32.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-pub struct MarkRunStartsResources<T>
+pub struct MarkRunStartsResources<'a, T>
 where
     T: abi::Sized,
 {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    pub count: Uniform<u32>,
+    pub count: Uniform<'a, u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    pub data: ReadOnlyStorage<[T]>,
+    pub data: Storage<'a, [T]>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    pub temporary_storage: Storage<[u32]>,
+    pub temporary_storage: Storage<'a, [u32], ReadWrite>,
 }
 
-type ResourcesLayout<T> = <MarkRunStartsResources<T> as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout<T> = <MarkRunStartsResources<'static, T> as Resources>::Layout;
 
 pub struct MarkRunStarts<T>
 where
@@ -52,7 +53,7 @@ where
             .create_compute_pipeline(
                 &ComputePipelineDescriptorBuilder::begin()
                     .layout(&pipeline_layout)
-                    .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
+                    .compute(ComputeStageBuilder::begin(&shader, "main").finish())
                     .finish(),
             )
             .await;

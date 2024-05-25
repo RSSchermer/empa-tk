@@ -8,7 +8,7 @@ publish = false
 
 [dependencies]
 arwa = { version = "0.1.0", path = "../../../../rudo/arwa" }
-empa = { version = "0.1.0", path = "../../../../glitz/empa", features = ["arwa"] }
+empa = { version = "0.1.0", path = "../../../../glitz/crates/empa", features = ["arwa"] }
 empa-tk = { version = "0.1.0", path = "../../../empa-tk" }
 futures = "0.3.21"
 oorandom = "11.1.3"

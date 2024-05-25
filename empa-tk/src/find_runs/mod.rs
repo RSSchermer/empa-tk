@@ -6,6 +6,7 @@ use empa::device::Device;
 use empa::type_flag::{O, X};
 use empa::{abi, buffer};
 
+use crate::count_buffer::CountBuffer;
 use crate::find_runs::collect_run_starts::{CollectRunStarts, CollectRunStartsResources};
 use crate::find_runs::mark_run_starts::{MarkRunStarts, MarkRunStartsResources};
 use crate::find_runs::resolve_run_count::{ResolveRunCount, ResolveRunCountResources};
@@ -20,7 +21,7 @@ const GROUPS_SIZE: u32 = 256;
 
 pub struct FindRunsInput<'a, T, U> {
     pub data: buffer::View<'a, [T], U>,
-    pub count: Option<Uniform<u32>>,
+    pub count: Option<Uniform<'a, u32>>,
 }
 
 pub struct FindRunsOutput<'a, U0, U1, U2> {
@@ -110,18 +111,14 @@ where
 
         let dispatch_indirect = count.is_some();
 
-        let count = count.unwrap_or_else(|| {
-            self.device
-                .create_buffer(data.len() as u32, buffer::Usages::uniform_binding())
-                .uniform()
-        });
+        let count = CountBuffer::new(count, &self.device, data.len() as u32);
 
         if dispatch_indirect {
             encoder = self.generate_dispatch.encode(
                 encoder,
                 GenerateDispatchResources {
                     group_size: self.group_size.uniform(),
-                    count: count.clone(),
+                    count: count.uniform(),
                     dispatch: self.dispatch.storage(),
                 },
             )
@@ -131,8 +128,8 @@ where
         encoder = self.mark_run_starts.encode(
             encoder,
             MarkRunStartsResources {
-                count: count.clone(),
-                data: data.read_only_storage(),
+                count: count.uniform(),
+                data: data.storage(),
                 temporary_storage: run_mapping.storage(),
             },
             dispatch_indirect,
@@ -144,7 +141,7 @@ where
             PrefixSumInput {
                 data: run_mapping,
                 count: if dispatch_indirect {
-                    Some(count.clone())
+                    Some(count.uniform())
                 } else {
                     None
                 },
@@ -153,8 +150,8 @@ where
         encoder = self.collect_run_starts.encode(
             encoder,
             CollectRunStartsResources {
-                count: count.clone(),
-                temporary_storage: run_mapping.read_only_storage(),
+                count: count.uniform(),
+                temporary_storage: run_mapping.storage(),
                 run_starts: run_starts.storage(),
             },
             dispatch_indirect,
@@ -164,8 +161,8 @@ where
         encoder = self.resolve_run_count.encode(
             encoder,
             ResolveRunCountResources {
-                count,
-                temporary_storage: run_mapping.read_only_storage(),
+                count: count.uniform(),
+                temporary_storage: run_mapping.storage(),
                 run_count: run_count.storage(),
             },
         );

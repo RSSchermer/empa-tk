@@ -2,7 +2,8 @@ use std::fmt;
 use std::fmt::Write;
 
 use bytemuck::Zeroable;
-use empa::buffer::{Buffer, ReadOnlyStorage, Storage, Uniform};
+use empa::access_mode::ReadWrite;
+use empa::buffer::{Buffer, Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
     ComputePipeline, ComputePipelineDescriptorBuilder, ComputeStageBuilder,
@@ -64,32 +65,33 @@ pub struct Uniforms {
 }
 
 #[derive(empa::resource_binding::Resources)]
-struct Resources<K, V>
+struct Resources<'a, K, V>
 where
     K: abi::Sized,
     V: abi::Sized,
 {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    max_count: Uniform<u32>,
+    max_count: Uniform<'a, u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    uniforms: Uniform<Uniforms>,
+    uniforms: Uniform<'a, Uniforms>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    keys_in: ReadOnlyStorage<[K]>,
+    keys_in: Storage<'a, [K]>,
     #[resource(binding = 3, visibility = "COMPUTE")]
-    keys_out: Storage<[K]>,
+    keys_out: Storage<'a, [K], ReadWrite>,
     #[resource(binding = 4, visibility = "COMPUTE")]
-    values_in: ReadOnlyStorage<[V]>,
+    values_in: Storage<'a, [V]>,
     #[resource(binding = 5, visibility = "COMPUTE")]
-    values_out: Storage<[V]>,
+    values_out: Storage<'a, [V], ReadWrite>,
     #[resource(binding = 6, visibility = "COMPUTE")]
-    global_base_bucket_offsets: ReadOnlyStorage<[[u32; RADIX_DIGITS]; RADIX_GROUPS]>,
+    global_base_bucket_offsets: Storage<'a, [[u32; RADIX_DIGITS]; RADIX_GROUPS]>,
     #[resource(binding = 7, visibility = "COMPUTE")]
-    group_state: Storage<[[GroupState; RADIX_DIGITS]]>,
+    group_state: Storage<'a, [[GroupState; RADIX_DIGITS]], ReadWrite>,
     #[resource(binding = 8, visibility = "COMPUTE")]
-    group_counter: Storage<u32>,
+    group_counter: Storage<'a, u32, ReadWrite>,
 }
 
-type ResourcesLayout<K, V> = <Resources<K, V> as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout<K, V> =
+    <Resources<'static, K, V> as empa::resource_binding::Resources>::Layout;
 
 pub struct BucketScatterByInput<'a, K, V, U0, U1, U2, U3, U4, U5> {
     pub keys_in: buffer::View<'a, [K], U0>,
@@ -98,7 +100,7 @@ pub struct BucketScatterByInput<'a, K, V, U0, U1, U2, U3, U4, U5> {
     pub values_out: buffer::View<'a, [V], U3>,
     pub global_base_bucket_offsets: buffer::View<'a, [[u32; RADIX_DIGITS]; RADIX_GROUPS], U4>,
     pub radix_group: u32,
-    pub max_count: Uniform<u32>,
+    pub max_count: Uniform<'a, u32>,
     pub dispatch_indirect: bool,
     pub dispatch: buffer::View<'a, DispatchWorkgroups, U5>,
     pub fallback_count: u32,
@@ -138,7 +140,7 @@ where
             device.create_compute_pipeline(
                 &ComputePipelineDescriptorBuilder::begin()
                     .layout(&pipeline_layout)
-                    .compute_unchecked(&ComputeStageBuilder::begin(&shader, "main").finish())
+                    .compute_unchecked(ComputeStageBuilder::begin(&shader, "main").finish())
                     .finish(),
             )
         }
@@ -207,11 +209,11 @@ where
             Resources {
                 max_count,
                 uniforms: uniforms.uniform(),
-                keys_in: keys_in.read_only_storage(),
+                keys_in: keys_in.storage(),
                 keys_out: keys_out.storage(),
-                values_in: values_in.read_only_storage(),
+                values_in: values_in.storage(),
                 values_out: values_out.storage(),
-                global_base_bucket_offsets: global_base_bucket_offsets.read_only_storage(),
+                global_base_bucket_offsets: global_base_bucket_offsets.storage(),
                 group_state: self.group_state.storage(),
                 group_counter: self.group_counter.storage(),
             },

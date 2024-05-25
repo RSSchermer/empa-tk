@@ -1,11 +1,12 @@
+use empa::access_mode::ReadWrite;
 use empa::buffer;
-use empa::buffer::{ReadOnlyStorage, Storage, Uniform};
+use empa::buffer::{Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
     ComputePipeline, ComputePipelineDescriptorBuilder, ComputeStageBuilder,
 };
 use empa::device::Device;
-use empa::resource_binding::BindGroupLayout;
+use empa::resource_binding::{BindGroupLayout, Resources};
 use empa::shader_module::{shader_source, ShaderSource};
 
 use crate::find_runs::GROUPS_SIZE;
@@ -13,16 +14,16 @@ use crate::find_runs::GROUPS_SIZE;
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-pub struct CollectRunStartsResources {
+pub struct CollectRunStartsResources<'a> {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    pub count: Uniform<u32>,
+    pub count: Uniform<'a, u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    pub temporary_storage: ReadOnlyStorage<[u32]>,
+    pub temporary_storage: Storage<'a, [u32]>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    pub run_starts: Storage<[u32]>,
+    pub run_starts: Storage<'a, [u32], ReadWrite>,
 }
 
-type ResourcesLayout = <CollectRunStartsResources as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout = <CollectRunStartsResources<'static> as Resources>::Layout;
 
 pub struct CollectRunStarts {
     device: Device,
@@ -41,7 +42,7 @@ impl CollectRunStarts {
             .create_compute_pipeline(
                 &ComputePipelineDescriptorBuilder::begin()
                     .layout(&pipeline_layout)
-                    .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
+                    .compute(ComputeStageBuilder::begin(&shader, "main").finish())
                     .finish(),
             )
             .await;

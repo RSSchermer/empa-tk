@@ -3,7 +3,7 @@ use std::error::Error;
 use arwa::console;
 use arwa::window::window;
 use bytemuck::Zeroable;
-use empa::adapter::Features;
+use empa::adapter::Feature;
 use empa::arwa::{NavigatorExt, RequestAdapterOptions};
 use empa::buffer::Buffer;
 use empa::device::DeviceDescriptor;
@@ -33,7 +33,7 @@ async fn compute() -> Result<(), Box<dyn Error>> {
         .ok_or("adapter not found")?;
     let device = adapter
         .request_device(&DeviceDescriptor {
-            required_features: Features::TIMESTAMP_QUERY,
+            required_features: Feature::TimestampQuery,
             required_limits: Default::default(),
         })
         .await?;

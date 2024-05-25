@@ -1,10 +1,11 @@
-use empa::buffer::{ReadOnlyStorage, Storage, Uniform};
+use empa::access_mode::ReadWrite;
+use empa::buffer::{Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
     ComputePipeline, ComputePipelineDescriptorBuilder, ComputeStageBuilder,
 };
 use empa::device::Device;
-use empa::resource_binding::BindGroupLayout;
+use empa::resource_binding::{BindGroupLayout, Resources};
 use empa::shader_module::{shader_source, ShaderSource};
 use empa::{abi, buffer};
 
@@ -17,20 +18,19 @@ const GROUP_ITERATIONS: u32 = 4;
 pub const BUCKET_HISTOGRAM_SEGMENT_SIZE: u32 = GROUP_SIZE * GROUP_ITERATIONS;
 
 #[derive(empa::resource_binding::Resources)]
-pub struct BucketHistogramResources<T>
+pub struct BucketHistogramResources<'a, T>
 where
     T: abi::Sized,
 {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    pub max_count: Uniform<u32>,
+    pub max_count: Uniform<'a, u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    pub data: ReadOnlyStorage<[T]>,
+    pub data: Storage<'a, [T]>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    pub global_histograms: Storage<[[u32; RADIX_DIGITS]; RADIX_GROUPS]>,
+    pub global_histograms: Storage<'a, [[u32; RADIX_DIGITS]; RADIX_GROUPS], ReadWrite>,
 }
 
-type ResourcesLayout<T> =
-    <BucketHistogramResources<T> as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout<T> = <BucketHistogramResources<'static, T> as Resources>::Layout;
 
 pub struct BucketHistogram<T>
 where
@@ -55,7 +55,7 @@ where
             .create_compute_pipeline(
                 &ComputePipelineDescriptorBuilder::begin()
                     .layout(&pipeline_layout)
-                    .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
+                    .compute(ComputeStageBuilder::begin(&shader, "main").finish())
                     .finish(),
             )
             .await;

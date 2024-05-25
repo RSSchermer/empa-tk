@@ -1,3 +1,4 @@
+use empa::access_mode::ReadWrite;
 use empa::buffer;
 use empa::buffer::Storage;
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
@@ -13,12 +14,12 @@ use crate::radix_sort::{RADIX_DIGITS, RADIX_GROUPS};
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-struct Resources {
+struct Resources<'a> {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    global_data: Storage<[[u32; RADIX_DIGITS]; RADIX_GROUPS]>,
+    global_data: Storage<'a, [[u32; RADIX_DIGITS]; RADIX_GROUPS], ReadWrite>,
 }
 
-type ResourcesLayout = <Resources as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout = <Resources<'static> as empa::resource_binding::Resources>::Layout;
 
 pub struct GlobalBucketOffsets {
     device: Device,
@@ -37,7 +38,7 @@ impl GlobalBucketOffsets {
             .create_compute_pipeline(
                 &ComputePipelineDescriptorBuilder::begin()
                     .layout(&pipeline_layout)
-                    .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
+                    .compute(ComputeStageBuilder::begin(&shader, "main").finish())
                     .finish(),
             )
             .await;

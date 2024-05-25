@@ -6,6 +6,7 @@ use empa::device::Device;
 use empa::type_flag::{O, X};
 use empa::{abi, buffer};
 
+use crate::count_buffer::CountBuffer;
 use crate::radix_sort::bucket_histogram::{
     BucketHistogram, BucketHistogramResources, BUCKET_HISTOGRAM_SEGMENT_SIZE,
 };
@@ -23,7 +24,7 @@ pub struct RadixSortByInput<'a, K, V, U0, U1, U2, U3> {
     pub values: buffer::View<'a, [V], U1>,
     pub temporary_key_storage: buffer::View<'a, [K], U2>,
     pub temporary_value_storage: buffer::View<'a, [V], U3>,
-    pub count: Option<Uniform<u32>>,
+    pub count: Option<Uniform<'a, u32>>,
 }
 
 pub struct RadixSortBy<K, V>
@@ -50,7 +51,7 @@ where
 {
     pub fn encode<U0, U1, U2, U3>(
         &mut self,
-        mut encoder: CommandEncoder,
+        encoder: CommandEncoder,
         input: RadixSortByInput<K, V, U0, U1, U2, U3>,
     ) -> CommandEncoder
     where
@@ -83,22 +84,16 @@ where
         } = input;
 
         let dispatch_indirect = count.is_some();
-
-        let count = count.unwrap_or_else(|| {
-            self.device
-                .create_buffer(keys.len() as u32, buffer::Usages::uniform_binding())
-                .uniform()
-        });
-
         let fallback_count = keys.len() as u32;
+        let count = CountBuffer::new(count, &self.device, fallback_count);
 
         if dispatch_indirect {
             encoder = self.generate_dispatches.encode(
                 encoder,
                 GenerateDispatchesResources {
                     segment_sizes: self.segment_sizes.uniform(),
-                    max_count: count.clone(),
-                    data: keys.read_only_storage(),
+                    max_count: count.uniform(),
+                    data: keys.storage(),
                     histogram_dispatch: self.histogram_dispatch.storage(),
                     scatter_dispatch: self.scatter_dispatch.storage(),
                 },
@@ -109,8 +104,8 @@ where
         encoder = self.bucket_histogram.encode(
             encoder,
             BucketHistogramResources {
-                max_count: count.clone(),
-                data: keys.read_only_storage(),
+                max_count: count.uniform(),
+                data: keys.storage(),
                 global_histograms: self.global_bucket_data.storage(),
             },
             dispatch_indirect,
@@ -138,7 +133,7 @@ where
                         values_out: values_b,
                         global_base_bucket_offsets: self.global_bucket_data.view(),
                         radix_group: i as u32,
-                        max_count: count.clone(),
+                        max_count: count.uniform(),
                         dispatch_indirect,
                         dispatch: self.scatter_dispatch.view(),
                         fallback_count,
@@ -154,7 +149,7 @@ where
                         values_out: values_a,
                         global_base_bucket_offsets: self.global_bucket_data.view(),
                         radix_group: i as u32,
-                        max_count: count.clone(),
+                        max_count: count.uniform(),
                         dispatch_indirect,
                         dispatch: self.scatter_dispatch.view(),
                         fallback_count,
@@ -223,7 +218,7 @@ where
 
     pub fn encode_half_precision<U0, U1, U2, U3>(
         &mut self,
-        mut encoder: CommandEncoder,
+        encoder: CommandEncoder,
         input: RadixSortByInput<u32, V, U0, U1, U2, U3>,
     ) -> CommandEncoder
     where

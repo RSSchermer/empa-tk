@@ -1,7 +1,8 @@
 use std::fmt::Write;
 use std::future::join;
 
-use empa::buffer::{Buffer, ReadOnlyStorage, Storage, Uniform};
+use empa::access_mode::ReadWrite;
+use empa::buffer::{Buffer, Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
     ComputePipeline, ComputePipelineDescriptorBuilder, ComputeStageBuilder,
@@ -12,6 +13,7 @@ use empa::shader_module::ShaderSource;
 use empa::type_flag::{O, X};
 use empa::{abi, buffer};
 
+use crate::count_buffer::CountBuffer;
 use crate::generate_dispatch::{GenerateDispatch, GenerateDispatchResources};
 use crate::write_value_type::write_value_type;
 
@@ -20,27 +22,28 @@ const SHADER_TEMPLATE: &str = include_str!("shader_template.wgsl");
 const GROUP_SIZE: u32 = 256;
 
 #[derive(empa::resource_binding::Resources)]
-struct Resources<B, V>
+struct Resources<'a, B, V>
 where
     B: abi::Sized,
     V: abi::Sized,
 {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    count: Uniform<u32>,
+    count: Uniform<'a, u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    gather_by: ReadOnlyStorage<[B]>,
+    gather_by: Storage<'a, [B]>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    data_in: ReadOnlyStorage<[V]>,
+    data_in: Storage<'a, [V]>,
     #[resource(binding = 3, visibility = "COMPUTE")]
-    data_out: Storage<[V]>,
+    data_out: Storage<'a, [V], ReadWrite>,
 }
 
-type ResourcesLayout<K, V> = <Resources<K, V> as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout<K, V> =
+    <Resources<'static, K, V> as empa::resource_binding::Resources>::Layout;
 
 pub struct GatherByInput<'a, B, V, U0, U1> {
     pub gather_by: buffer::View<'a, [B], U0>,
     pub data: buffer::View<'a, [V], U1>,
-    pub count: Option<Uniform<u32>>,
+    pub count: Option<Uniform<'a, u32>>,
 }
 
 pub struct GatherBy<B, V>
@@ -78,7 +81,7 @@ where
             device.create_compute_pipeline(
                 &ComputePipelineDescriptorBuilder::begin()
                     .layout(&pipeline_layout)
-                    .compute_unchecked(&ComputeStageBuilder::begin(&shader, "main").finish())
+                    .compute_unchecked(ComputeStageBuilder::begin(&shader, "main").finish())
                     .finish(),
             )
         };
@@ -125,18 +128,14 @@ where
 
         let dispatch_indirect = count.is_some();
 
-        let count = count.unwrap_or_else(|| {
-            self.device
-                .create_buffer(data.len() as u32, buffer::Usages::uniform_binding())
-                .uniform()
-        });
+        let count = CountBuffer::new(count, &self.device, data.len() as u32);
 
         if dispatch_indirect {
             encoder = self.generate_dispatch.encode(
                 encoder,
                 GenerateDispatchResources {
                     group_size: self.group_size.uniform(),
-                    count: count.clone(),
+                    count: count.uniform(),
                     dispatch: self.dispatch.storage(),
                 },
             );
@@ -145,9 +144,9 @@ where
         let bind_group = self.device.create_bind_group(
             &self.bind_group_layout,
             Resources {
-                count,
-                gather_by: gather_by.read_only_storage(),
-                data_in: data.read_only_storage(),
+                count: count.uniform(),
+                gather_by: gather_by.storage(),
+                data_in: data.storage(),
                 data_out: output.storage(),
             },
         );

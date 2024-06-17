@@ -19,7 +19,7 @@ fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>, @builtin(local_invocatio
 
     workgroupBarrier();
 
-    for (var i = 1u; i < GROUP_SIZE; i <<= 1) {
+    for (var i = 1u; i < GROUP_SIZE; i <<= 1u) {
         var value: u32;
 
         if (local_index >= i) {

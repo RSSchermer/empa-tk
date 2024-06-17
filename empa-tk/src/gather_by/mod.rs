@@ -61,8 +61,8 @@ where
 
 impl<B, V> GatherBy<B, V>
 where
-    B: abi::Sized,
-    V: abi::Sized,
+    B: abi::Sized + 'static,
+    V: abi::Sized + 'static,
 {
     async fn init_internal(device: Device, by_type: &str, shader_template: &str) -> Self {
         let mut code = String::new();
@@ -176,7 +176,7 @@ where
 
 impl<V> GatherBy<u32, V>
 where
-    V: abi::Sized,
+    V: abi::Sized + 'static,
 {
     pub async fn init_u32(device: Device) -> Self {
         Self::init_internal(device, "u32", SHADER_TEMPLATE).await
@@ -185,7 +185,7 @@ where
 
 impl<V> GatherBy<i32, V>
 where
-    V: abi::Sized,
+    V: abi::Sized + 'static,
 {
     pub async fn init_i32(device: Device) -> Self {
         Self::init_internal(device, "i32", SHADER_TEMPLATE).await

@@ -1,12 +1,12 @@
 [workspace]
 members = [
     "empa-tk",
-    "examples/web/find_runs",
-    "examples/web/gather_by",
-    "examples/web/prefix_sum_exclusive",
-    "examples/web/prefix_sum_inclusive",
-    "examples/web/radix_sort",
-    "examples/web/radix_sort_by",
-    "examples/web/radix_sort_half_precision",
-    "examples/web/scatter_by"
+    "examples/find_runs",
+    "examples/gather_by",
+    "examples/prefix_sum_exclusive",
+    "examples/prefix_sum_inclusive",
+    "examples/radix_sort",
+    "examples/radix_sort_by",
+    "examples/radix_sort_half_precision",
+    "examples/scatter_by"
 ]

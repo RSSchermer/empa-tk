@@ -109,7 +109,7 @@ where
 
 impl<T> BucketScatter<T>
 where
-    T: abi::Sized,
+    T: abi::Sized + 'static,
 {
     async fn init_internal(device: Device, shader_source: &ShaderSource) -> Self {
         let shader = device.create_shader_module(shader_source);

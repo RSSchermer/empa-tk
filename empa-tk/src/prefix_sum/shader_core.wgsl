@@ -73,7 +73,7 @@ fn write_group_state(group_index: u32, status: u32, payload: DATA_TYPE) {
 @compute @workgroup_size(256, 1, 1)
 fn main(@builtin(local_invocation_index) local_index: u32) {
     if local_index == 0 {
-        group_index = atomicAdd(&group_counter, 1);
+        group_index = atomicAdd(&group_counter, 1u);
     }
 
     workgroupBarrier();
@@ -90,10 +90,10 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
 
     workgroupBarrier();
 
-    for (var i = 1u; i < SEGMENT_SIZE; i <<= 1) {
+    for (var i = 1u; i < SEGMENT_SIZE; i <<= 1u) {
         var values: array<u32, VALUES_PER_THREAD>;
 
-        for (var j = 0u; j < VALUES_PER_THREAD; j += 1) {
+        for (var j = 0u; j < VALUES_PER_THREAD; j += 1u) {
             let index = j * GROUP_SIZE + local_index;
 
             if (index >= i) {
@@ -105,7 +105,7 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
 
         workgroupBarrier();
 
-        for (var j = 0u; j < VALUES_PER_THREAD; j += 1) {
+        for (var j = 0u; j < VALUES_PER_THREAD; j += 1u) {
             let index = j * GROUP_SIZE + local_index;
 
             local_data[index] = values[j];
@@ -152,7 +152,7 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
                 prefix += additional_prefix;
 
                 if target_status == GROUP_STATUS_A {
-                    target_group_index -= 1;
+                    target_group_index -= 1u;
                 } else if target_status == GROUP_STATUS_P {
                     write_group_state(group_index, GROUP_STATUS_P, prefix + aggregate);
 

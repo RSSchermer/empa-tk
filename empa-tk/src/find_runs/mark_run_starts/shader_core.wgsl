@@ -13,7 +13,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     if index != 0 && index < count {
         if data[index] != data[index - 1] {
-            temporary_storage[index] = 1;
+            temporary_storage[index] = 1u;
         }
     }
 }

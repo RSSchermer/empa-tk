@@ -46,7 +46,7 @@ where
 
 impl<T> FindRuns<T>
 where
-    T: abi::Sized,
+    T: abi::Sized + 'static,
 {
     async fn init_internal(
         device: Device,

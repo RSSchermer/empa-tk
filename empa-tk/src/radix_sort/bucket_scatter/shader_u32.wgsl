@@ -1,6 +1,6 @@
 const GROUP_SIZE = 256u;
 const VALUES_PER_THREAD = 4u;
-const SEGMENT_SIZE = 1024; // GROUP_SIZE * VALUES_PER_THREAD;
+const SEGMENT_SIZE = 1024u; // GROUP_SIZE * VALUES_PER_THREAD;
 const RADIX_SIZE = 8u;
 
 const RADIX_DIGITS = 256u;//1 << RADIX_SIZE;
@@ -48,10 +48,10 @@ fn extract_radix_digits(value: u32) -> u32 {
 
 fn workspace_prefix_sum_inclusive(local_index: u32) {
     // Hillis-Steele style prefix sum over the workspace
-    for (var i = 1u; i < SEGMENT_SIZE; i <<= 1) {
+    for (var i = 1u; i < SEGMENT_SIZE; i <<= 1u) {
         var values: array<u32, VALUES_PER_THREAD>;
 
-        for (var j = 0u; j < VALUES_PER_THREAD; j += 1) {
+        for (var j = 0u; j < VALUES_PER_THREAD; j += 1u) {
             let index = j * GROUP_SIZE + local_index;
 
             if (index >= i) {
@@ -63,7 +63,7 @@ fn workspace_prefix_sum_inclusive(local_index: u32) {
 
         workgroupBarrier();
 
-        for (var j = 0u; j < VALUES_PER_THREAD; j += 1) {
+        for (var j = 0u; j < VALUES_PER_THREAD; j += 1u) {
             let index = j * GROUP_SIZE + local_index;
 
             workspace[index] = values[j];
@@ -79,7 +79,7 @@ fn sort_local_data(local_index: u32) {
 
         for (var i = local_index; i < SEGMENT_SIZE; i += GROUP_SIZE) {
             if i == 0 {
-                workspace[0] = 0;
+                workspace[0] = 0u;
             } else {
                 let bit_value_prev = (local_data[i - 1] >> bit_offset) & 1;
     
@@ -94,7 +94,7 @@ fn sort_local_data(local_index: u32) {
         var output_indices: array<u32, VALUES_PER_THREAD>;
         var values: array<u32, VALUES_PER_THREAD>;
 
-        for (var j = 0u; j < VALUES_PER_THREAD; j += 1) {
+        for (var j = 0u; j < VALUES_PER_THREAD; j += 1u) {
             let index = j * GROUP_SIZE + local_index;
 
             let bit_value = (local_data[index] >> bit_offset) & 1;
@@ -114,7 +114,7 @@ fn sort_local_data(local_index: u32) {
 
         workgroupBarrier();
 
-        for (var j = 0u; j < VALUES_PER_THREAD; j += 1) {
+        for (var j = 0u; j < VALUES_PER_THREAD; j += 1u) {
             let index = j * GROUP_SIZE + local_index;
 
             local_data[output_indices[j]] = values[j];
@@ -127,7 +127,7 @@ fn sort_local_data(local_index: u32) {
 @compute @workgroup_size(256, 1, 1)
 fn main(@builtin(local_invocation_index) local_index: u32) {
     if local_index == 0 {
-        segment_index = atomicAdd(&group_counter, 1);
+        segment_index = atomicAdd(&group_counter, 1u);
     }
 
     let uniform_segment_index = workgroupUniformLoad(&segment_index);
@@ -157,7 +157,7 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
 
     // Now find "runs" of the same key in the sorted local data, mark the start of runs with `1` in the workspace
     // array, otherwise set to `0`.
-    for (var j = 0u; j < VALUES_PER_THREAD; j += 1) {
+    for (var j = 0u; j < VALUES_PER_THREAD; j += 1u) {
         let index = j * GROUP_SIZE + local_index;
 
         let current_radix = extract_radix_digits(local_data[index]);
@@ -166,9 +166,9 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
         is_run_start[j] = index == 0 || current_radix != prev_radix;
 
         if index != 0 && current_radix != prev_radix {
-            workspace[index] = 1;
+            workspace[index] = 1u;
         } else {
-            workspace[index] = 0;
+            workspace[index] = 0u;
         }
     }
 
@@ -179,7 +179,7 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
 
     var run_indices: array<u32, VALUES_PER_THREAD>;
 
-    for (var j = 0u; j < VALUES_PER_THREAD; j += 1) {
+    for (var j = 0u; j < VALUES_PER_THREAD; j += 1u) {
         let index = j * GROUP_SIZE + local_index;
 
         run_indices[j] = workspace[index];
@@ -195,7 +195,7 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
 
     workgroupBarrier();
 
-    for (var j = 0u; j < VALUES_PER_THREAD; j += 1) {
+    for (var j = 0u; j < VALUES_PER_THREAD; j += 1u) {
         if is_run_start[j] {
             let run_index = run_indices[j];
             let index = j * GROUP_SIZE + local_index;
@@ -209,7 +209,7 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
     var bucket_counts: array<u32, VALUES_PER_THREAD>;
     var within_bucket_indices: array<u32, VALUES_PER_THREAD>;
 
-    for (var j = 0u; j < VALUES_PER_THREAD; j += 1) {
+    for (var j = 0u; j < VALUES_PER_THREAD; j += 1u) {
         let run_index = run_indices[j];
 
         // Lookup the bucket counts and the within-bucket-index for each value. Note that the bucket count will only
@@ -236,12 +236,12 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
     workgroupBarrier();
 
     for (var i = local_index; i < SEGMENT_SIZE; i += GROUP_SIZE) {
-        workspace[i] = 0;
+        workspace[i] = 0u;
     }
 
     workgroupBarrier();
 
-    for (var j = 0u; j < VALUES_PER_THREAD; j += 1) {
+    for (var j = 0u; j < VALUES_PER_THREAD; j += 1u) {
         if is_run_start[j] {
             let index = j * GROUP_SIZE + local_index;
             let bucket_index = extract_radix_digits(local_data[index]);
@@ -297,7 +297,7 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
 
     workgroupBarrier();
 
-    for (var j = 0u; j < VALUES_PER_THREAD; j += 1) {
+    for (var j = 0u; j < VALUES_PER_THREAD; j += 1u) {
         let index = j * GROUP_SIZE + local_index;
 
         let bucket_index = extract_radix_digits(local_data[index]);

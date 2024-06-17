@@ -43,7 +43,7 @@ where
 
 impl<T> RadixSort<T>
 where
-    T: abi::Sized,
+    T: abi::Sized + 'static,
 {
     pub fn encode<U0, U1>(
         &mut self,

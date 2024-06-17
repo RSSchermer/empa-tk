@@ -48,7 +48,7 @@ where
 
 impl<T> GenerateDispatches<T>
 where
-    T: abi::Sized,
+    T: abi::Sized + 'static,
 {
     pub async fn init(device: Device) -> Self {
         let shader = device.create_shader_module(&SHADER);

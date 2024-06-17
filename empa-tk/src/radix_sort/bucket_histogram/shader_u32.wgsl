@@ -3,7 +3,7 @@ const GROUP_SIZE = 256u;
 const GROUP_ITERATIONS = 4u;
 
 const RADIX_DIGITS = 256u;//1 << RADIX_SIZE;
-const SEGMENT_SIZE = 1024;//GROUP_SIZE * GROUP_ITERATIONS;
+const SEGMENT_SIZE = 1024u;//GROUP_SIZE * GROUP_ITERATIONS;
 const RADIX_GROUPS = 4u;//32 / RADIX_SIZE;
 
 @group(0) @binding(0)
@@ -33,7 +33,7 @@ fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>, @builtin(local_invocatio
             for (var j = 0u; j < RADIX_GROUPS; j++) {
                 let digits = (value >> (j * RADIX_SIZE)) & (RADIX_DIGITS - 1);
 
-                atomicAdd(&local_histograms[j][digits], 1);
+                atomicAdd(&local_histograms[j][digits], 1u);
             }
         }
     }

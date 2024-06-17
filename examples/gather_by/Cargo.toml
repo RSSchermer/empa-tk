@@ -1,0 +1,13 @@
+[package]
+name = "gather-by-example"
+version = "0.1.0"
+authors = ["Roland Schermer <roland0507@gmail.com>"]
+edition = "2021"
+license = "MIT"
+publish = false
+
+[dependencies]
+empa = { version = "0.1.0", path = "../../../glitz/crates/empa" }
+empa-tk = { version = "0.1.0", path = "../../empa-tk" }
+futures = "0.3.21"
+pollster = "0.3"

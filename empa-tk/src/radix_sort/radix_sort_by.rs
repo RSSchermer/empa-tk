@@ -46,8 +46,8 @@ where
 
 impl<K, V> RadixSortBy<K, V>
 where
-    K: abi::Sized,
-    V: abi::Sized,
+    K: abi::Sized + 'static,
+    V: abi::Sized + 'static,
 {
     pub fn encode<U0, U1, U2, U3>(
         &mut self,
@@ -164,7 +164,7 @@ where
 
 impl<V> RadixSortBy<u32, V>
 where
-    V: abi::Sized,
+    V: abi::Sized + 'static,
 {
     pub async fn init_u32(device: Device) -> Self {
         let global_bucket_data =

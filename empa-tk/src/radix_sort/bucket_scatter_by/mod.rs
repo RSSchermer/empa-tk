@@ -120,8 +120,8 @@ where
 
 impl<K, V> BucketScatterBy<K, V>
 where
-    K: abi::Sized,
-    V: abi::Sized,
+    K: abi::Sized + 'static,
+    V: abi::Sized + 'static,
 {
     async fn init_internal(device: Device, shader_template: &str) -> Self {
         let mut code = String::new();
@@ -242,7 +242,7 @@ where
 
 impl<V> BucketScatterBy<u32, V>
 where
-    V: abi::Sized,
+    V: abi::Sized + 'static,
 {
     pub async fn init_u32(device: Device) -> Self {
         Self::init_internal(device, SHADER_TEMPLATE_U32).await

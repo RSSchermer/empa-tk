@@ -91,7 +91,7 @@ fn main(@builtin(local_invocation_index) local_index: u32) {
     workgroupBarrier();
 
     for (var i = 1u; i < SEGMENT_SIZE; i <<= 1u) {
-        var values: array<u32, VALUES_PER_THREAD>;
+        var values: array<DATA_TYPE, VALUES_PER_THREAD>;
 
         for (var j = 0u; j < VALUES_PER_THREAD; j += 1u) {
             let index = j * GROUP_SIZE + local_index;

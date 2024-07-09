@@ -71,7 +71,7 @@ where
 
         write!(code, "alias BY_TYPE = {};\n\n{}", by_type, shader_template).unwrap();
 
-        let shader_source = ShaderSource::parse(code).unwrap();
+        let shader_source = ShaderSource::unparsed(code);
         let shader = device.create_shader_module(&shader_source);
 
         let bind_group_layout = device.create_bind_group_layout::<ResourcesLayout<B, V>>();
